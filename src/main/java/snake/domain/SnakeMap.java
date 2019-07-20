@@ -1,4 +1,4 @@
-package snake;
+package snake.domain;
 
 import java.util.Arrays;
 

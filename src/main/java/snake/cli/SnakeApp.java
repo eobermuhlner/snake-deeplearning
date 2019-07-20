@@ -1,4 +1,8 @@
-package snake;
+package snake.cli;
+
+import snake.controller.RandomSnakeController;
+import snake.domain.SnakeGame;
+import snake.domain.SnakeMap;
 
 public class SnakeApp {
     public static void main(String[] args) {

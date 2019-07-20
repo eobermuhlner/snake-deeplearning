@@ -1,7 +1,7 @@
 package snake.wall;
 
-import snake.SnakeMap;
-import snake.Tile;
+import snake.domain.SnakeMap;
+import snake.domain.Tile;
 
 import java.util.Random;
 

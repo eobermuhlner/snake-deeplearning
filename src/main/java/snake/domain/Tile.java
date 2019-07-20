@@ -1,4 +1,4 @@
-package snake;
+package snake.domain;
 
 public enum Tile {
     Empty('.'),

@@ -1,5 +1,6 @@
-package snake;
+package snake.domain;
 
+import snake.controller.SnakeController;
 import snake.wall.NoWallBuilder;
 import snake.wall.WallBuilder;
 

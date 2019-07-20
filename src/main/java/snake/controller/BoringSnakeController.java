@@ -1,4 +1,7 @@
-package snake;
+package snake.controller;
+
+import snake.domain.Snake;
+import snake.domain.SnakeMap;
 
 public class BoringSnakeController implements SnakeController {
     @Override

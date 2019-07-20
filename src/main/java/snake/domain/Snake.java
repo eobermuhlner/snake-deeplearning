@@ -1,7 +1,4 @@
-package snake;
-
-import java.util.Arrays;
-import java.util.HashMap;
+package snake.domain;
 
 public class Snake {
     private int[] x;

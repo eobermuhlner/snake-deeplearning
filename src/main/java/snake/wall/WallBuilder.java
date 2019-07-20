@@ -1,6 +1,6 @@
 package snake.wall;
 
-import snake.SnakeMap;
+import snake.domain.SnakeMap;
 
 public interface WallBuilder {
     int createWall(SnakeMap map);

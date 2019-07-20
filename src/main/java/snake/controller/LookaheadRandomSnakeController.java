@@ -1,4 +1,8 @@
-package snake;
+package snake.controller;
+
+import snake.domain.Snake;
+import snake.domain.SnakeMap;
+import snake.domain.Tile;
 
 import java.util.ArrayList;
 import java.util.List;

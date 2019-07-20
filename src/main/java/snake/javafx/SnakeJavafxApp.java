@@ -1,4 +1,4 @@
-package snake;
+package snake.javafx;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -24,13 +24,15 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import snake.controller.DeeplearningSnakeController;
+import snake.domain.SnakeGame;
+import snake.domain.Tile;
 import snake.wall.CrosshairWallBuilder;
-import snake.wall.DotsWallBuilder;
 import snake.wall.WallBuilder;
 
 import java.text.DecimalFormat;
 
-public class SnakeGuiApp extends Application {
+public class SnakeJavafxApp extends Application {
 
     private static final DecimalFormat integerFormat = new DecimalFormat("##0");
 
