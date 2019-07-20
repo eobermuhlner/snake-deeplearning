@@ -157,8 +157,8 @@ public class DeeplearningSnakeController implements SnakeController {
     public static void main(String[] args) {
         try {
             //train("snake", new BoringSnakeController(), 60);
-            //train("snake", new LookaheadRandomSnakeController(), 60);
-            for (int i = 0; i < 10; i++) {
+            train("snake", new LookaheadRandomSnakeController(), 10);
+            for (int i = 0; i < 0; i++) {
                 train("snake", null, 60);
             }
         } catch (IOException e) {
@@ -293,6 +293,8 @@ public class DeeplearningSnakeController implements SnakeController {
                         .activation(Activation.SOFTMAX)
                         .lossFunction(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                         .build())
+                .pretrain(false)
+                .backprop(true)
                 .build();
         MultiLayerNetwork network = new MultiLayerNetwork(configuration);
         return network;
