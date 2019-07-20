@@ -17,7 +17,7 @@ public class SnakeGame {
     private final SnakeController snakeController;
 
     private boolean hasEaten;
-    private SnakeController.Move move;
+    private Move move;
 
     private Random random = new Random();
 
@@ -77,7 +77,7 @@ public class SnakeGame {
         return hasEaten;
     }
 
-    public SnakeController.Move getMove() {
+    public Move getMove() {
         return move;
     }
 }

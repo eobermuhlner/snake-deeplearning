@@ -14,10 +14,7 @@ import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.AdaDelta;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
-import snake.domain.Snake;
-import snake.domain.SnakeGame;
-import snake.domain.SnakeMap;
-import snake.domain.Tile;
+import snake.domain.*;
 import snake.wall.DotsWallBuilder;
 import snake.wall.WallBuilder;
 
