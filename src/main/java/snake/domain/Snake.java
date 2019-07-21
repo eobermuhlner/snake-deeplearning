@@ -22,7 +22,7 @@ public class Snake {
     }
 
     public void render(SnakeMap map) {
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i <= length; i++) {
             Tile tile = i == 0 ? Tile.SnakeHead : Tile.SnakeTail;
             map.set(getX(i), getY(i), tile);
         }
@@ -50,7 +50,7 @@ public class Snake {
             length++;
         }
 
-        if (length > 1) {
+        if (length > 0) {
             snakeMap.set(oldHeadX, oldHeadY, Tile.SnakeTail);
         }
 

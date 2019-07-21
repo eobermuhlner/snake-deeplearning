@@ -28,6 +28,7 @@ import snake.controller.DeeplearningSnakeController;
 import snake.domain.SnakeGame;
 import snake.domain.Tile;
 import snake.wall.CrosshairWallBuilder;
+import snake.wall.DotsWallBuilder;
 import snake.wall.WallBuilder;
 
 import java.text.DecimalFormat;
@@ -144,8 +145,8 @@ public class SnakeJavafxApp extends Application {
 
     private void resetSimulation() {
         stopSimulation();
-        //WallBuilder wallBuilder = new DotsWallBuilder();
-        WallBuilder wallBuilder = new CrosshairWallBuilder();
+        WallBuilder wallBuilder = new DotsWallBuilder(2);
+        //WallBuilder wallBuilder = new CrosshairWallBuilder();
         game = new SnakeGame(20, 20, wallBuilder, 1, deeplearningSnakeController);
         drawSnakeMap();
 

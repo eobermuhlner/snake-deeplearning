@@ -29,10 +29,12 @@ public class DeeplearningSnakeController implements SnakeController {
     private static final int LEFT = 2;
     private static final int RIGHT = 3;
 
-    private static final int INPUT_RADIUS = 2;
+    private static final int INPUT_RADIUS = 10;
     private static final int INPUT_WIDTH = 1 + 2 * INPUT_RADIUS;
     private static final int INPUT_COUNT = INPUT_WIDTH * INPUT_WIDTH + 2;
     private static final int OUTPUT_COUNT = 4;
+
+    private static final boolean PRINT_DEBUG = true;
 
     private static Map<Tile, Double> tileToInput = new HashMap<>();
     static {
@@ -83,20 +85,20 @@ public class DeeplearningSnakeController implements SnakeController {
         INDArray outputArray = model.output(inputArray);
         Move move = pickMove(outputArray);
 
-        /*
-        if (!Tile.isValidMove(snakeMap.get(x + move.dX, y + move.dY))) {
-            System.out.println("INVALID " + move);
-            System.out.println("  input =" + inputArray);
-            System.out.println("  output=" + outputArray);
-            for (int inputY = 0; inputY < INPUT_WIDTH; inputY++) {
-                for (int inputX = 0; inputX < INPUT_WIDTH; inputX++) {
-                    System.out.print(snakeMap.get(x + (inputX - INPUT_RADIUS), y + (inputY - INPUT_RADIUS)).tileChar);
+        if (PRINT_DEBUG) {
+            if (!Tile.isValidMove(snakeMap.get(x + move.dX, y + move.dY))) {
+                System.out.println("INVALID " + move);
+                System.out.println("  input =" + inputArray);
+                System.out.println("  output=" + outputArray);
+                for (int inputY = 0; inputY < INPUT_WIDTH; inputY++) {
+                    for (int inputX = 0; inputX < INPUT_WIDTH; inputX++) {
+                        System.out.print(snakeMap.get(x + (inputX - INPUT_RADIUS), y + (inputY - INPUT_RADIUS)).tileChar);
+                    }
+                    System.out.println();
                 }
                 System.out.println();
             }
-            System.out.println();
         }
-        */
 
         return move;
     }
@@ -155,10 +157,8 @@ public class DeeplearningSnakeController implements SnakeController {
     public static void main(String[] args) {
         try {
             //train("snake", new BoringSnakeController(), 60);
-            train("snake", new LookaheadRandomSnakeController(), 10);
-            for (int i = 0; i < 0; i++) {
-                train("snake", null, 60);
-            }
+            train("snake", new LookaheadRandomSnakeController(), 1 * 60);
+            train("snake", null, 1 * 60);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -195,7 +195,7 @@ public class DeeplearningSnakeController implements SnakeController {
             int height = random.nextInt(10) + 5;
             int initialLength = random.nextInt(width * height / 2) + 1;
             //WallBuilder wallBuilder = new CrosshairWallBuilder();
-            WallBuilder wallBuilder = new DotsWallBuilder();
+            WallBuilder wallBuilder = new DotsWallBuilder(2);
             return new SnakeGame(width, height, wallBuilder, initialLength, controller);
         });
     }
@@ -291,8 +291,6 @@ public class DeeplearningSnakeController implements SnakeController {
                         .activation(Activation.SOFTMAX)
                         .lossFunction(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                         .build())
-                .pretrain(false)
-                .backprop(true)
                 .build();
         MultiLayerNetwork network = new MultiLayerNetwork(configuration);
         return network;
