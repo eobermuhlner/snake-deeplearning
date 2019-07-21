@@ -24,4 +24,9 @@ public class DotsWallBuilder implements WallBuilder {
         }
         return n;
     }
+
+    @Override
+    public String toString() {
+        return "Dots " + percent + "%";
+    }
 }

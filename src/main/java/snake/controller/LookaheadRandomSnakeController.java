@@ -44,4 +44,9 @@ public class LookaheadRandomSnakeController implements SnakeController {
         int index = random.nextInt(values.length);
         return values[index];
     }
+
+    @Override
+    public String toString() {
+        return "Lookahead Random";
+    }
 }

@@ -4,10 +4,8 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.beans.binding.Bindings;
-import javafx.beans.property.IntegerProperty;
-import javafx.beans.property.SimpleIntegerProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
+import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.scene.Group;
@@ -15,8 +13,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -24,11 +21,13 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import snake.controller.DeeplearningSnakeController;
+import javafx.util.StringConverter;
+import snake.controller.*;
 import snake.domain.SnakeGame;
 import snake.domain.Tile;
 import snake.wall.CrosshairWallBuilder;
 import snake.wall.DotsWallBuilder;
+import snake.wall.NoWallBuilder;
 import snake.wall.WallBuilder;
 
 import java.text.DecimalFormat;
@@ -38,16 +37,20 @@ public class SnakeJavafxApp extends Application {
     private static final DecimalFormat integerFormat = new DecimalFormat("##0");
 
     private SnakeGame game;
-    private DeeplearningSnakeController deeplearningSnakeController = new DeeplearningSnakeController("snake");
 
     private Canvas snakeCanvas;
     private Timeline simulationTimeline = new Timeline();
     private double simulationRate = 50; // milliseconds
 
+    private IntegerProperty mapSizeProperty = new SimpleIntegerProperty();
+    private ListProperty<WallBuilder> wallBuilderListProperty = new SimpleListProperty<>(FXCollections.observableArrayList());
+    private ObjectProperty<WallBuilder> wallBuilderProperty = new SimpleObjectProperty<>();
+    private ListProperty<SnakeController> controllerListProperty = new SimpleListProperty<>(FXCollections.observableArrayList());
+    private ObjectProperty<SnakeController> controllerProperty = new SimpleObjectProperty<>();
+
     private Button runButton;
     private Button stepButton;
     private Button stopButton;
-    private Button trainButton;
 
     private StringProperty statusProperty = new SimpleStringProperty();
     private IntegerProperty lengthProperty = new SimpleIntegerProperty();
@@ -59,11 +62,47 @@ public class SnakeJavafxApp extends Application {
         Group root = new Group();
         Scene scene = new Scene(root);
 
+        TabPane mainTabPane = new TabPane();
+        root.getChildren().add(mainTabPane);
+        mainTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        mainTabPane.getTabs().add(new Tab("Play", createPlayView()));
+        mainTabPane.getTabs().add(new Tab("AI", createAiView()));
+
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private Node createPlayView() {
         BorderPane borderPane = new BorderPane();
-        root.getChildren().add(borderPane);
 
         HBox toolbar = new HBox();
         borderPane.setTop(toolbar);
+
+        mapSizeProperty.setValue(20);
+        TextField mapSizeField = new TextField();
+        mapSizeField.setMaxWidth(50);
+        toolbar.getChildren().add(mapSizeField);
+        Bindings.bindBidirectional(mapSizeField.textProperty(), mapSizeProperty, integerFormat);
+
+        wallBuilderListProperty.add(new NoWallBuilder());
+        wallBuilderListProperty.add(new DotsWallBuilder(2));
+        wallBuilderListProperty.add(new CrosshairWallBuilder());
+        wallBuilderProperty.set(wallBuilderListProperty.get(0));
+        ComboBox<WallBuilder> wallBuilderComboBox = new ComboBox<>();
+        toolbar.getChildren().add(wallBuilderComboBox);
+        Bindings.bindBidirectional(wallBuilderComboBox.itemsProperty(), wallBuilderListProperty);
+        wallBuilderComboBox.valueProperty().bindBidirectional(wallBuilderProperty);
+
+        controllerListProperty.add(new LookaheadRandomSnakeController());
+        controllerListProperty.add(new RandomSnakeController());
+        controllerListProperty.add(new BoringSnakeController());
+        controllerListProperty.add(new DeeplearningSnakeController("snake"));
+        controllerProperty.set(controllerListProperty.get(0));
+        ComboBox<SnakeController> controllerComboBox = new ComboBox<>();
+        toolbar.getChildren().add(controllerComboBox);
+        Bindings.bindBidirectional(controllerComboBox.itemsProperty(), controllerListProperty);
+        controllerComboBox.valueProperty().bindBidirectional(controllerProperty);
 
         Button resetButton = new Button("Reset");
         toolbar.getChildren().add(resetButton);
@@ -73,8 +112,6 @@ public class SnakeJavafxApp extends Application {
         toolbar.getChildren().add(stepButton);
         stopButton = new Button("Stop");
         toolbar.getChildren().add(stopButton);
-        trainButton = new Button("Train");
-        toolbar.getChildren().add(trainButton);
 
         resetButton.addEventHandler(ActionEvent.ACTION, event -> {
             resetSimulation();
@@ -89,22 +126,26 @@ public class SnakeJavafxApp extends Application {
         stopButton.addEventHandler(ActionEvent.ACTION, event -> {
             stopSimulation();
         });
-        trainButton.addEventHandler(ActionEvent.ACTION, event -> {
-            trainSimulation();
-        });
 
         Node propertiesPane = createPropertiesPane();
         borderPane.setRight(propertiesPane);
 
-        snakeCanvas = new Canvas(800, 600);
+        snakeCanvas = new Canvas(600, 600);
         borderPane.setCenter(snakeCanvas);
 
         resetSimulation();
-        updateRunButtons(false, false);
+        updateRunButtons(false);
         setupRendering();
 
-        primaryStage.setScene(scene);
-        primaryStage.show();
+        return borderPane;
+    }
+
+    private Node createAiView() {
+        BorderPane borderPane = new BorderPane();
+
+
+
+        return borderPane;
     }
 
     private Node createPropertiesPane() {
@@ -145,9 +186,12 @@ public class SnakeJavafxApp extends Application {
 
     private void resetSimulation() {
         stopSimulation();
-        WallBuilder wallBuilder = new DotsWallBuilder(2);
-        //WallBuilder wallBuilder = new CrosshairWallBuilder();
-        game = new SnakeGame(20, 20, wallBuilder, 1, deeplearningSnakeController);
+        game = new SnakeGame(
+                mapSizeProperty.get(),
+                mapSizeProperty.get(),
+                wallBuilderProperty.get(),
+                1,
+                controllerProperty.get());
         drawSnakeMap();
 
         statusProperty.setValue("Alive");
@@ -174,27 +218,18 @@ public class SnakeJavafxApp extends Application {
 
     private void runSimulation() {
         simulationTimeline.play();
-        updateRunButtons(true, false);
+        updateRunButtons(true);
     }
 
     private void stopSimulation() {
         simulationTimeline.stop();
-        updateRunButtons(false, false);
+        updateRunButtons(false);
     }
 
-    private void trainSimulation() {
-        updateRunButtons(false, true);
-        double score = deeplearningSnakeController.train(1);
-        System.out.println("SCORE " + score);
-        updateRunButtons(false, false);
-    }
-
-    private void updateRunButtons(boolean running, boolean training) {
-        runButton.setDisable(running || training);
-        stopButton.setDisable(!running && !training);
-        stepButton.setDisable(running || training);
-
-        trainButton.setDisable(running || training);
+    private void updateRunButtons(boolean running) {
+        runButton.setDisable(running);
+        stopButton.setDisable(!running);
+        stepButton.setDisable(running);
     }
 
     private void setupRendering() {

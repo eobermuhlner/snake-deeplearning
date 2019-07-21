@@ -19,4 +19,9 @@ public class RandomSnakeController implements SnakeController {
         int index = random.nextInt(values.length);
         return values[index];
     }
+
+    @Override
+    public String toString() {
+        return "Random";
+    }
 }

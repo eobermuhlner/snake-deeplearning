@@ -140,6 +140,11 @@ public class DeeplearningSnakeController implements SnakeController {
         return model.score();
     }
 
+    @Override
+    public String toString() {
+        return "AI " + name;
+    }
+
     private static MultiLayerNetwork loadNetwork(String fileName) {
         try {
             if (new File(fileName).exists()) {

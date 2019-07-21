@@ -33,4 +33,9 @@ public class BoringSnakeController implements SnakeController {
             return Move.Left;
         }
     }
+
+    @Override
+    public String toString() {
+        return "Boring";
+    }
 }

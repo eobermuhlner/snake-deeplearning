@@ -7,4 +7,9 @@ public class NoWallBuilder implements WallBuilder {
     public int createWall(SnakeMap map) {
         return 0;
     }
+
+    @Override
+    public String toString() {
+        return "No Walls";
+    }
 }

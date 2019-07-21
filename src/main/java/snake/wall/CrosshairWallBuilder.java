@@ -31,4 +31,9 @@ public class CrosshairWallBuilder implements WallBuilder {
 
         return count;
     }
+
+    @Override
+    public String toString() {
+        return "Crosshair";
+    }
 }
