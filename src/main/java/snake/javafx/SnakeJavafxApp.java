@@ -30,6 +30,8 @@ import snake.wall.DotsWallBuilder;
 import snake.wall.NoWallBuilder;
 import snake.wall.WallBuilder;
 
+import java.io.File;
+import java.io.FilenameFilter;
 import java.text.DecimalFormat;
 
 public class SnakeJavafxApp extends Application {
@@ -84,6 +86,7 @@ public class SnakeJavafxApp extends Application {
         mapSizeField.setMaxWidth(50);
         toolbar.getChildren().add(mapSizeField);
         Bindings.bindBidirectional(mapSizeField.textProperty(), mapSizeProperty, integerFormat);
+        mapSizeProperty.addListener((observable, oldValue, newValue) -> resetSimulation());
 
         wallBuilderListProperty.add(new NoWallBuilder());
         wallBuilderListProperty.add(new DotsWallBuilder(2));
@@ -93,16 +96,18 @@ public class SnakeJavafxApp extends Application {
         toolbar.getChildren().add(wallBuilderComboBox);
         Bindings.bindBidirectional(wallBuilderComboBox.itemsProperty(), wallBuilderListProperty);
         wallBuilderComboBox.valueProperty().bindBidirectional(wallBuilderProperty);
+        wallBuilderProperty.addListener((observable, oldValue, newValue) -> resetSimulation());
 
         controllerListProperty.add(new LookaheadRandomSnakeController());
         controllerListProperty.add(new RandomSnakeController());
         controllerListProperty.add(new BoringSnakeController());
-        controllerListProperty.add(new DeeplearningSnakeController("snake"));
+        addControllersFromFiles();
         controllerProperty.set(controllerListProperty.get(0));
         ComboBox<SnakeController> controllerComboBox = new ComboBox<>();
         toolbar.getChildren().add(controllerComboBox);
         Bindings.bindBidirectional(controllerComboBox.itemsProperty(), controllerListProperty);
         controllerComboBox.valueProperty().bindBidirectional(controllerProperty);
+        controllerProperty.addListener((observable, oldValue, newValue) -> resetSimulation());
 
         Button resetButton = new Button("Reset");
         toolbar.getChildren().add(resetButton);
@@ -138,6 +143,20 @@ public class SnakeJavafxApp extends Application {
         setupRendering();
 
         return borderPane;
+    }
+
+    private void addControllersFromFiles() {
+        File dir = new File(".");
+        File[] files = dir.listFiles(new FilenameFilter() {
+            public boolean accept(File dir, String name) {
+                return name.toLowerCase().endsWith(".dl4j");
+            }
+        });
+        for (File file : files) {
+            String name = file.getName();
+            name = name.substring(0, name.length() - ".dl4j".length());
+            controllerListProperty.add(new DeeplearningSnakeController(name));
+        }
     }
 
     private Node createAiView() {
@@ -247,6 +266,9 @@ public class SnakeJavafxApp extends Application {
 
     private void drawSnakeMap() {
         GraphicsContext gc = snakeCanvas.getGraphicsContext2D();
+
+        gc.setFill(Color.WHITE);
+        gc.fill();
 
         double tileWidth = 5;
         double tileHeight = 5;
