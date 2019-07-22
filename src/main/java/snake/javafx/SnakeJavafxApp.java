@@ -27,6 +27,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import javafx.util.StringConverter;
+import javafx.util.converter.IntegerStringConverter;
 import org.jetbrains.annotations.NotNull;
 import snake.controller.*;
 import snake.domain.SnakeGame;
@@ -41,11 +43,12 @@ import java.io.FilenameFilter;
 import java.text.DecimalFormat;
 import java.text.Format;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SnakeJavafxApp extends Application {
 
-    private static final DecimalFormat integerFormat = new DecimalFormat("##0");
+    private static final DecimalFormat INTEGER_FORMAT = new DecimalFormat("##0");
 
     private SnakeGame game;
 
@@ -99,7 +102,7 @@ public class SnakeJavafxApp extends Application {
         TextField mapSizeField = new TextField();
         mapSizeField.setMaxWidth(50);
         toolbar.getChildren().add(mapSizeField);
-        Bindings.bindBidirectional(mapSizeField.textProperty(), mapSizeProperty, integerFormat);
+        Bindings.bindBidirectional(mapSizeField.textProperty(), mapSizeProperty, INTEGER_FORMAT);
         mapSizeProperty.addListener((observable, oldValue, newValue) -> resetSimulation());
 
         wallBuilderListProperty.add(new NoWallBuilder());
@@ -179,6 +182,11 @@ public class SnakeJavafxApp extends Application {
     private Node createAiView() {
         BorderPane masterDetailPane = new BorderPane();
 
+        HBox toolbar = new HBox();
+        masterDetailPane.setTop(toolbar);
+        Button newButton = new Button("New");
+        toolbar.getChildren().add(newButton);
+
         ListView<DeeplearningSnakeController> listView = new ListView<>();
         masterDetailPane.setLeft(listView);
         Bindings.bindBidirectional(listView.itemsProperty(), deeplearningControllerListProperty);
@@ -217,6 +225,10 @@ public class SnakeJavafxApp extends Application {
         ObservableList<XYChart.Data<Number, Number>> statisticsEatenData = addLineChart(chartsPane, "Eaten");
 
         // actions
+        newButton.addEventHandler(ActionEvent.ACTION, event -> {
+            showNewAiDialog();
+        });
+
         AtomicBoolean training = new AtomicBoolean(false);
         startTrainButton.addEventHandler(ActionEvent.ACTION, event -> {
             training.set(true);
@@ -272,6 +284,41 @@ public class SnakeJavafxApp extends Application {
         return masterDetailPane;
     }
 
+    private void showNewAiDialog() {
+        Dialog<DeeplearningSnakeController> dialog = new Dialog<>();
+        dialog.setTitle("New AI");
+        dialog.setHeaderText("Specify a new AI to control the snake in the game.");
+
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        StringProperty nameProperty = new SimpleStringProperty();
+
+        GridPane gridPane = new GridPane();
+        dialog.getDialogPane().setContent(gridPane);
+        int rowIndex = 0;
+        addTextField(gridPane, rowIndex++, "Name:", nameProperty);
+
+        Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
+        okButton.setDisable(true);
+        nameProperty.addListener((observable, oldValue, newValue) -> {
+            okButton.setDisable(newValue.trim().isEmpty());
+        });
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == ButtonType.OK) {
+                return new DeeplearningSnakeController(nameProperty.get());
+            }
+            return null;
+        });
+
+        Optional<DeeplearningSnakeController> result = dialog.showAndWait();
+        result.ifPresent(controller -> {
+            controller.save();
+            controllerListProperty.add(controller);
+            deeplearningControllerListProperty.add(controller);
+            deeplearningControllerProperty.set(controller);
+        });
+    }
+
     private void reduceData(ObservableList<XYChart.Data<Number, Number>> data, int reduceToStep) {
         Iterator<XYChart.Data<Number, Number>> iterator = data.iterator();
         Double maxYValue = null;
@@ -291,8 +338,8 @@ public class SnakeJavafxApp extends Application {
     @NotNull
     private ObservableList<XYChart.Data<Number, Number>> addLineChart(VBox chartsPane, String yAxisLabel) {
         NumberAxis xAxis = new NumberAxis();
-        xAxis.setLabel("Epoch");
         xAxis.setTickUnit(1.0);
+        xAxis.setMinorTickCount(0);
 
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel(yAxisLabel);
@@ -317,9 +364,9 @@ public class SnakeJavafxApp extends Application {
         int rowIndex = 0;
 
         addLabel(propertiesPane, rowIndex++, "Status:", statusProperty);
-        addLabel(propertiesPane, rowIndex++, "Length:", lengthProperty, integerFormat);
-        addLabel(propertiesPane, rowIndex++, "Steps:", stepsProperty, integerFormat);
-        addLabel(propertiesPane, rowIndex++, "Hunger:", hungerProperty, integerFormat);
+        addLabel(propertiesPane, rowIndex++, "Length:", lengthProperty, INTEGER_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Steps:", stepsProperty, INTEGER_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Hunger:", hungerProperty, INTEGER_FORMAT);
 
         return propertiesPane;
     }
@@ -347,7 +394,7 @@ public class SnakeJavafxApp extends Application {
         gridPane.add(new Label(label), 0, rowIndex);
         TextField control = new TextField();
         gridPane.add(control, 1, rowIndex);
-        Bindings.bindBidirectional(control.textProperty(), statusProperty);
+        Bindings.bindBidirectional(control.textProperty(), property);
         return control;
     }
 
