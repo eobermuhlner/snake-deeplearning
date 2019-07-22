@@ -3,9 +3,11 @@ package snake.javafx;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.scene.Group;
@@ -13,15 +15,19 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import javafx.util.StringConverter;
+import org.jetbrains.annotations.NotNull;
 import snake.controller.*;
 import snake.domain.SnakeGame;
 import snake.domain.Tile;
@@ -33,6 +39,9 @@ import snake.wall.WallBuilder;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.text.DecimalFormat;
+import java.text.Format;
+import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SnakeJavafxApp extends Application {
 
@@ -58,6 +67,11 @@ public class SnakeJavafxApp extends Application {
     private IntegerProperty lengthProperty = new SimpleIntegerProperty();
     private IntegerProperty stepsProperty = new SimpleIntegerProperty();
     private IntegerProperty hungerProperty = new SimpleIntegerProperty();
+
+    private ListProperty<DeeplearningSnakeController> deeplearningControllerListProperty = new SimpleListProperty<>(FXCollections.observableArrayList());
+    private ObjectProperty<DeeplearningSnakeController> deeplearningControllerProperty = new SimpleObjectProperty<>();
+    private ObjectProperty<SnakeController> teacherControllerProperty = new SimpleObjectProperty<>();
+    private IntegerProperty epochProperty = new SimpleIntegerProperty();
 
     @Override
     public void start(Stage primaryStage) {
@@ -155,52 +169,196 @@ public class SnakeJavafxApp extends Application {
         for (File file : files) {
             String name = file.getName();
             name = name.substring(0, name.length() - ".dl4j".length());
-            controllerListProperty.add(new DeeplearningSnakeController(name));
+            DeeplearningSnakeController controller = new DeeplearningSnakeController(name);
+
+            controllerListProperty.add(controller);
+            deeplearningControllerListProperty.add(controller);
         }
     }
 
     private Node createAiView() {
-        BorderPane borderPane = new BorderPane();
+        BorderPane masterDetailPane = new BorderPane();
 
+        ListView<DeeplearningSnakeController> listView = new ListView<>();
+        masterDetailPane.setLeft(listView);
+        Bindings.bindBidirectional(listView.itemsProperty(), deeplearningControllerListProperty);
+        deeplearningControllerProperty.bind(listView.getSelectionModel().selectedItemProperty());
 
+        BorderPane editorPane = new BorderPane();
+        masterDetailPane.setCenter(editorPane);
 
-        return borderPane;
+        // properties pane
+        GridPane propertiesPane = new GridPane();
+        editorPane.setLeft(propertiesPane);
+
+        int rowIndex = 0;
+        Label nameLabel = addLabel(propertiesPane, rowIndex++, "Name:");
+
+        addComboBox(propertiesPane, rowIndex++, "Teacher:", controllerListProperty, teacherControllerProperty);
+
+        Button startTrainButton = new Button("Start Training");
+        propertiesPane.add(startTrainButton, 1, rowIndex);
+        rowIndex++;
+
+        Button stopTrainButton = new Button("Stop Training");
+        propertiesPane.add(stopTrainButton, 1, rowIndex);
+        rowIndex++;
+
+        Button saveButton = new Button("Save");
+        propertiesPane.add(saveButton, 1, rowIndex);
+        rowIndex++;
+
+        // line charts
+        VBox chartsPane = new VBox();
+        editorPane.setCenter(chartsPane);
+
+        ObservableList<XYChart.Data<Number, Number>> scoreData = addLineChart(chartsPane, "Score");
+        ObservableList<XYChart.Data<Number, Number>> statisticsDeadData = addLineChart(chartsPane, "Dead");
+        ObservableList<XYChart.Data<Number, Number>> statisticsEatenData = addLineChart(chartsPane, "Eaten");
+
+        // actions
+        AtomicBoolean training = new AtomicBoolean(false);
+        startTrainButton.addEventHandler(ActionEvent.ACTION, event -> {
+            training.set(true);
+            startTrainButton.setDisable(true);
+            stopTrainButton.setDisable(false);
+            new Thread(() -> {
+                while (training.get()) {
+                    DeeplearningSnakeController controller = deeplearningControllerProperty.get();
+                    double score = controller.train(1, teacherControllerProperty.get());
+                    DeeplearningSnakeController.Statistics statistics = controller.test();
+                    Platform.runLater(() -> {
+                        int epoch = epochProperty.get();
+                        scoreData.add(new XYChart.Data<>(epoch, score));
+                        statisticsDeadData.add(new XYChart.Data<>(epoch, statistics.dead));
+                        statisticsEatenData.add(new XYChart.Data<>(epoch, statistics.eaten));
+                        if (epoch % 10000 == 0) {
+                            reduceData(scoreData, 100);
+                            reduceData(statisticsDeadData, 100);
+                            reduceData(statisticsEatenData, 100);
+                        } else if (epoch % 1000 == 0) {
+                            reduceData(scoreData, 10);
+                            reduceData(statisticsDeadData, 10);
+                            reduceData(statisticsEatenData, 10);
+                        }
+
+                        epochProperty.setValue(epoch + 1);
+                    });
+                }
+                Platform.runLater(() -> {
+                    startTrainButton.setDisable(false);
+                    stopTrainButton.setDisable(true);
+                });
+            }).start();
+        });
+        stopTrainButton.addEventHandler(ActionEvent.ACTION, event -> {
+            training.set(false);
+        });
+        saveButton.addEventHandler(ActionEvent.ACTION, event -> {
+            saveButton.setDisable(true);
+            DeeplearningSnakeController controller = deeplearningControllerProperty.get();
+            controller.save();
+            saveButton.setDisable(false);
+        });
+
+        deeplearningControllerProperty.addListener((observable, oldValue, newController) -> {
+            nameLabel.setText(newController.toString());
+            epochProperty.setValue(0);
+            scoreData.clear();
+        });
+
+        listView.getSelectionModel().select(0);
+
+        return masterDetailPane;
+    }
+
+    private void reduceData(ObservableList<XYChart.Data<Number, Number>> data, int reduceToStep) {
+        Iterator<XYChart.Data<Number, Number>> iterator = data.iterator();
+        Double maxYValue = null;
+        while (iterator.hasNext()) {
+            XYChart.Data<Number, Number> singleData = iterator.next();
+            double yValue = singleData.getYValue().doubleValue();
+            maxYValue = maxYValue == null ? yValue : Math.max(maxYValue, yValue);
+            if ((int)singleData.getXValue() % reduceToStep == 0) {
+                singleData.setYValue(maxYValue);
+                maxYValue = null;
+            } else {
+                iterator.remove();
+            }
+        }
+    }
+
+    @NotNull
+    private ObservableList<XYChart.Data<Number, Number>> addLineChart(VBox chartsPane, String yAxisLabel) {
+        NumberAxis xAxis = new NumberAxis();
+        xAxis.setLabel("Epoch");
+        xAxis.setTickUnit(1.0);
+
+        NumberAxis yAxis = new NumberAxis();
+        yAxis.setLabel(yAxisLabel);
+
+        LineChart<Number, Number> lineChart = new LineChart<>(xAxis, yAxis);
+        lineChart.setCreateSymbols(false);
+        lineChart.setLegendVisible(false);
+        lineChart.setMaxHeight(200);
+        chartsPane.getChildren().add(lineChart);
+
+        ObservableList<XYChart.Series<Number, Number>> series = FXCollections.observableArrayList();
+        lineChart.dataProperty().set(series);
+
+        ObservableList<XYChart.Data<Number, Number>> data = FXCollections.observableArrayList();
+        series.add(new XYChart.Series<>(data));
+
+        return data;
     }
 
     private Node createPropertiesPane() {
         GridPane propertiesPane = new GridPane();
         int rowIndex = 0;
 
-        {
-            propertiesPane.add(new Label("Status:"), 0, rowIndex);
-            Label label = new Label("");
-            propertiesPane.add(label, 1, rowIndex);
-            Bindings.bindBidirectional(label.textProperty(), statusProperty);
-            rowIndex++;
-        }
-        {
-            propertiesPane.add(new Label("Length:"), 0, rowIndex);
-            Label label = new Label("");
-            Bindings.bindBidirectional(label.textProperty(), lengthProperty, integerFormat);
-            propertiesPane.add(label, 1, rowIndex);
-            rowIndex++;
-        }
-        {
-            propertiesPane.add(new Label("Steps:"), 0, rowIndex);
-            Label label = new Label("");
-            Bindings.bindBidirectional(label.textProperty(), stepsProperty, integerFormat);
-            propertiesPane.add(label, 1, rowIndex);
-            rowIndex++;
-        }
-        {
-            propertiesPane.add(new Label("Hunger:"), 0, rowIndex);
-            Label label = new Label("");
-            Bindings.bindBidirectional(label.textProperty(), hungerProperty, integerFormat);
-            propertiesPane.add(label, 1, rowIndex);
-            rowIndex++;
-        }
+        addLabel(propertiesPane, rowIndex++, "Status:", statusProperty);
+        addLabel(propertiesPane, rowIndex++, "Length:", lengthProperty, integerFormat);
+        addLabel(propertiesPane, rowIndex++, "Steps:", stepsProperty, integerFormat);
+        addLabel(propertiesPane, rowIndex++, "Hunger:", hungerProperty, integerFormat);
 
         return propertiesPane;
+    }
+
+    private Label addLabel(GridPane gridPane, int rowIndex, String label) {
+        gridPane.add(new Label(label), 0, rowIndex);
+        Label control = new Label();
+        gridPane.add(control, 1, rowIndex);
+        return control;
+    }
+
+    private Label addLabel(GridPane gridPane, int rowIndex, String label, StringProperty property) {
+        Label control = addLabel(gridPane, rowIndex, label);
+        Bindings.bindBidirectional(control.textProperty(), property);
+        return control;
+    }
+
+    private Label addLabel(GridPane gridPane, int rowIndex, String label, Property property, Format format) {
+        Label control = addLabel(gridPane, rowIndex, label);
+        Bindings.bindBidirectional(control.textProperty(), property, format);
+        return control;
+    }
+
+    private TextField addTextField(GridPane gridPane, int rowIndex, String label, StringProperty property) {
+        gridPane.add(new Label(label), 0, rowIndex);
+        TextField control = new TextField();
+        gridPane.add(control, 1, rowIndex);
+        Bindings.bindBidirectional(control.textProperty(), statusProperty);
+        return control;
+    }
+
+    private <T> ComboBox<T> addComboBox(GridPane gridPane, int rowIndex, String label, ListProperty<T> listProperty, ObjectProperty<T> elementProperty) {
+        gridPane.add(new Label(label), 0, rowIndex);
+        ComboBox<T> control = new ComboBox<>();
+        gridPane.add(control, 1, rowIndex);
+        Bindings.bindBidirectional(control.itemsProperty(), listProperty);
+        control.valueProperty().bindBidirectional(elementProperty);
+        elementProperty.setValue(listProperty.get(0));
+        return control;
     }
 
     private void resetSimulation() {
