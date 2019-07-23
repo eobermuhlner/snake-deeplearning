@@ -27,16 +27,11 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import javafx.util.StringConverter;
-import javafx.util.converter.IntegerStringConverter;
 import org.jetbrains.annotations.NotNull;
 import snake.controller.*;
 import snake.domain.SnakeGame;
 import snake.domain.Tile;
-import snake.wall.CrosshairWallBuilder;
-import snake.wall.DotsWallBuilder;
-import snake.wall.NoWallBuilder;
-import snake.wall.WallBuilder;
+import snake.wall.*;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -73,7 +68,8 @@ public class SnakeJavafxApp extends Application {
 
     private ListProperty<DeeplearningSnakeController> deeplearningControllerListProperty = new SimpleListProperty<>(FXCollections.observableArrayList());
     private ObjectProperty<DeeplearningSnakeController> deeplearningControllerProperty = new SimpleObjectProperty<>();
-    private ObjectProperty<SnakeController> teacherControllerProperty = new SimpleObjectProperty<>();
+    private ObjectProperty<SnakeController> trainTeacherControllerProperty = new SimpleObjectProperty<>();
+    private ObjectProperty<WallBuilder> trainWallBuilderProperty = new SimpleObjectProperty<>();
     private IntegerProperty epochProperty = new SimpleIntegerProperty();
 
     @Override
@@ -107,7 +103,10 @@ public class SnakeJavafxApp extends Application {
 
         wallBuilderListProperty.add(new NoWallBuilder());
         wallBuilderListProperty.add(new DotsWallBuilder(2));
+        wallBuilderListProperty.add(new DotsWallBuilder(5));
+        wallBuilderListProperty.add(new DotsWallBuilder(10));
         wallBuilderListProperty.add(new CrosshairWallBuilder());
+        wallBuilderListProperty.add(new RandomCompositeWallBuilder());
         wallBuilderProperty.set(wallBuilderListProperty.get(0));
         ComboBox<WallBuilder> wallBuilderComboBox = new ComboBox<>();
         toolbar.getChildren().add(wallBuilderComboBox);
@@ -202,7 +201,8 @@ public class SnakeJavafxApp extends Application {
         int rowIndex = 0;
         Label nameLabel = addLabel(propertiesPane, rowIndex++, "Name:");
 
-        addComboBox(propertiesPane, rowIndex++, "Teacher:", controllerListProperty, teacherControllerProperty);
+        addComboBox(propertiesPane, rowIndex++, "Teacher:", controllerListProperty, trainTeacherControllerProperty);
+        addComboBox(propertiesPane, rowIndex++, "Walls:", wallBuilderListProperty, trainWallBuilderProperty);
 
         Button startTrainButton = new Button("Start Training");
         propertiesPane.add(startTrainButton, 1, rowIndex);
@@ -237,13 +237,13 @@ public class SnakeJavafxApp extends Application {
             new Thread(() -> {
                 while (training.get()) {
                     DeeplearningSnakeController controller = deeplearningControllerProperty.get();
-                    double score = controller.train(1, teacherControllerProperty.get());
+                    double score = controller.train(1, trainTeacherControllerProperty.get(), trainWallBuilderProperty.get());
                     DeeplearningSnakeController.Statistics statistics = controller.test();
                     Platform.runLater(() -> {
                         int epoch = epochProperty.get();
                         scoreData.add(new XYChart.Data<>(epoch, score));
-                        statisticsDeadData.add(new XYChart.Data<>(epoch, statistics.dead));
-                        statisticsEatenData.add(new XYChart.Data<>(epoch, statistics.eaten));
+                        statisticsDeadData.add(new XYChart.Data<>(epoch, statistics.dead * 100));
+                        statisticsEatenData.add(new XYChart.Data<>(epoch, statistics.eaten * 100));
                         if (epoch % 10000 == 0) {
                             reduceData(scoreData, 100);
                             reduceData(statisticsDeadData, 100);

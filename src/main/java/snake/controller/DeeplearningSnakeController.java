@@ -16,6 +16,7 @@ import org.nd4j.linalg.learning.config.AdaDelta;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 import snake.domain.*;
 import snake.wall.DotsWallBuilder;
+import snake.wall.RandomCompositeWallBuilder;
 import snake.wall.WallBuilder;
 
 import java.io.File;
@@ -29,7 +30,7 @@ public class DeeplearningSnakeController implements SnakeController {
     private static final int LEFT = 2;
     private static final int RIGHT = 3;
 
-    private static final int INPUT_RADIUS = 2;
+    private static final int INPUT_RADIUS = 3;
     private static final int INPUT_WIDTH = 1 + 2 * INPUT_RADIUS;
     private static final int INPUT_COUNT = INPUT_WIDTH * INPUT_WIDTH + 2;
     private static final int OUTPUT_COUNT = 4;
@@ -124,12 +125,12 @@ public class DeeplearningSnakeController implements SnakeController {
     }
 
     public double train(int n) {
-        return train(n, this);
+        return train(n, this, new RandomCompositeWallBuilder());
     }
 
-    public double train(int n, SnakeController teacher) {
+    public double train(int n, SnakeController teacher, WallBuilder wallBuilder) {
         for (int i = 0; i < n; i++) {
-            List<DataSet> dataSets = createGameDataSets(teacher);
+            List<DataSet> dataSets = createGameDataSets(teacher, wallBuilder);
 
             if (!dataSets.isEmpty()) {
                 DataSet dataSet = DataSet.merge(dataSets);
@@ -145,6 +146,10 @@ public class DeeplearningSnakeController implements SnakeController {
     }
 
     public Statistics test(int steps) {
+        return test(steps, new DotsWallBuilder(2));
+    }
+
+    public Statistics test(int steps, WallBuilder wallBuilder) {
         int countEaten = 0;
         int countDead = 0;
 
@@ -152,7 +157,7 @@ public class DeeplearningSnakeController implements SnakeController {
         boolean alive = true;
         for (int i = 0; i < steps; i++) {
             if (game == null || !alive) {
-                game = new SnakeGame(20, 20, new DotsWallBuilder(2), 1, this);
+                game = new SnakeGame(20, 20, wallBuilder, 1, this);
             }
             alive = game.step();
             if (alive) {
@@ -200,13 +205,15 @@ public class DeeplearningSnakeController implements SnakeController {
 
     public static void train(String name, SnakeController teacher, long seconds) throws IOException, InterruptedException {
         DeeplearningSnakeController deeplearningSnakeController = new DeeplearningSnakeController(name);
+        WallBuilder wallBuilder = new RandomCompositeWallBuilder();
+
         if (teacher == null) {
             teacher = deeplearningSnakeController;
         }
 
         long endMillis = System.currentTimeMillis() + seconds * 1000;
         do {
-            double score = deeplearningSnakeController.train(1, teacher);
+            double score = deeplearningSnakeController.train(1, teacher, wallBuilder);
             System.out.println("Score: " + score);
         } while (System.currentTimeMillis() < endMillis);
 
@@ -220,14 +227,12 @@ public class DeeplearningSnakeController implements SnakeController {
         deeplearningSnakeController.save();
     }
 
-    private static List<DataSet> createGameDataSets(SnakeController controller) {
+    private static List<DataSet> createGameDataSets(SnakeController controller, WallBuilder wallBuilder) {
         return createGameDataSets(() -> {
             Random random = new Random();
             int width = random.nextInt(10) + 5;
             int height = random.nextInt(10) + 5;
             int initialLength = random.nextInt(width * height / 2) + 1;
-            //WallBuilder wallBuilder = new CrosshairWallBuilder();
-            WallBuilder wallBuilder = new DotsWallBuilder(2);
             return new SnakeGame(width, height, wallBuilder, initialLength, controller);
         });
     }
