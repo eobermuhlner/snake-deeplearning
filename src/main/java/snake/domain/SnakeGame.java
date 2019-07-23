@@ -49,12 +49,31 @@ public class SnakeGame {
     private void setRandomApple() {
         int x;
         int y;
+        int freeNeighbours;
         do {
             x = random.nextInt(width);
             y = random.nextInt(height);
-        } while (snakeMap.get(x, y) != Tile.Empty);
+            freeNeighbours = countFreeNeighbours(x, y);
+        } while (snakeMap.get(x, y) != Tile.Empty && freeNeighbours >= 2);
 
         snakeMap.setApple(x, y);
+    }
+
+    private int countFreeNeighbours(int x, int y) {
+        int count = 0;
+        if (snakeMap.get(x - 1, y) == Tile.Empty) {
+            count++;
+        }
+        if (snakeMap.get(x + 1, y) == Tile.Empty) {
+            count++;
+        }
+        if (snakeMap.get(x, y - 1) == Tile.Empty) {
+            count++;
+        }
+        if (snakeMap.get(x, y + 1) == Tile.Empty) {
+            count++;
+        }
+        return count;
     }
 
     public Tile getTiles(int x, int y) {
