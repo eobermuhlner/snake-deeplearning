@@ -29,12 +29,12 @@ public class DeeplearningSnakeController implements SnakeController {
     private static final int LEFT = 2;
     private static final int RIGHT = 3;
 
-    private static final int INPUT_RADIUS = 10;
+    private static final int INPUT_RADIUS = 2;
     private static final int INPUT_WIDTH = 1 + 2 * INPUT_RADIUS;
     private static final int INPUT_COUNT = INPUT_WIDTH * INPUT_WIDTH + 2;
     private static final int OUTPUT_COUNT = 4;
 
-    private static final boolean PRINT_DEBUG = true;
+    private static final boolean PRINT_DEBUG = false;
 
     private static Map<Tile, Double> tileToInput = new HashMap<>();
     static {
@@ -140,6 +140,33 @@ public class DeeplearningSnakeController implements SnakeController {
         return model.score();
     }
 
+    public Statistics test() {
+        return test(1000);
+    }
+
+    public Statistics test(int steps) {
+        int countEaten = 0;
+        int countDead = 0;
+
+        SnakeGame game = null;
+        boolean alive = true;
+        for (int i = 0; i < steps; i++) {
+            if (game == null || !alive) {
+                game = new SnakeGame(20, 20, new DotsWallBuilder(2), 1, this);
+            }
+            alive = game.step();
+            if (alive) {
+                boolean hasEaten = game.getHasEaten();
+                if (hasEaten) {
+                    countEaten++;
+                }
+            } else {
+                countDead++;
+            }
+        }
+        return new Statistics((double)countDead/steps, (double)countEaten/steps);
+    }
+
     @Override
     public String toString() {
         return "AI " + name;
@@ -162,8 +189,8 @@ public class DeeplearningSnakeController implements SnakeController {
     public static void main(String[] args) {
         try {
             //train("snake", new BoringSnakeController(), 60);
-            train("snake", new LookaheadRandomSnakeController(), 1 * 60);
-            train("snake", null, 1 * 60);
+            train("snake", new LookaheadRandomSnakeController(), 0);
+            //train("snake", null, 1 * 60);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -292,12 +319,23 @@ public class DeeplearningSnakeController implements SnakeController {
                 .list()
                 .layer(0, new DenseLayer.Builder().nIn(INPUT_COUNT).nOut(denseCount).build())
                 .layer(1, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
-                .layer(2, new OutputLayer.Builder().nIn(denseCount).nOut(OUTPUT_COUNT)
+                .layer(2, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
+                .layer(3, new OutputLayer.Builder().nIn(denseCount).nOut(OUTPUT_COUNT)
                         .activation(Activation.SOFTMAX)
                         .lossFunction(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                         .build())
                 .build();
         MultiLayerNetwork network = new MultiLayerNetwork(configuration);
         return network;
+    }
+
+    public static class Statistics {
+        public final double dead;
+        public final double eaten;
+
+        public Statistics(double dead, double eaten) {
+            this.dead = dead;
+            this.eaten = eaten;
+        }
     }
 }

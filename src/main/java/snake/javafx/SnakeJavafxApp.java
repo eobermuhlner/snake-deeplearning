@@ -221,8 +221,8 @@ public class SnakeJavafxApp extends Application {
         editorPane.setCenter(chartsPane);
 
         ObservableList<XYChart.Data<Number, Number>> scoreData = addLineChart(chartsPane, "Score");
-        ObservableList<XYChart.Data<Number, Number>> statisticsDeadData = addLineChart(chartsPane, "Dead");
-        ObservableList<XYChart.Data<Number, Number>> statisticsEatenData = addLineChart(chartsPane, "Eaten");
+        ObservableList<XYChart.Data<Number, Number>> statisticsDeadData = addLineChart(chartsPane, "Dead %");
+        ObservableList<XYChart.Data<Number, Number>> statisticsEatenData = addLineChart(chartsPane, "Eaten %");
 
         // actions
         newButton.addEventHandler(ActionEvent.ACTION, event -> {
@@ -277,6 +277,8 @@ public class SnakeJavafxApp extends Application {
             nameLabel.setText(newController.toString());
             epochProperty.setValue(0);
             scoreData.clear();
+            statisticsDeadData.clear();
+            statisticsEatenData.clear();
         });
 
         listView.getSelectionModel().select(0);
