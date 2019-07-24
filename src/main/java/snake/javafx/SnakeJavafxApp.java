@@ -88,6 +88,8 @@ public class SnakeJavafxApp extends Application {
     private ObjectProperty<WallBuilder> trainWallBuilderProperty = new SimpleObjectProperty<>();
     private IntegerProperty epochProperty = new SimpleIntegerProperty();
 
+    private ListView<DeeplearningSnakeController> masterDeeplearningControllerListView;
+
     @Override
     public void start(Stage primaryStage) {
         Group root = new Group();
@@ -202,10 +204,10 @@ public class SnakeJavafxApp extends Application {
         Button newButton = new Button("New AI");
         toolbar.getChildren().add(newButton);
 
-        ListView<DeeplearningSnakeController> listView = new ListView<>();
-        masterDetailPane.setLeft(listView);
-        Bindings.bindBidirectional(listView.itemsProperty(), deeplearningControllerListProperty);
-        deeplearningControllerProperty.bind(listView.getSelectionModel().selectedItemProperty());
+        masterDeeplearningControllerListView = new ListView<>();
+        masterDetailPane.setLeft(masterDeeplearningControllerListView);
+        Bindings.bindBidirectional(masterDeeplearningControllerListView.itemsProperty(), deeplearningControllerListProperty);
+        deeplearningControllerProperty.bind(masterDeeplearningControllerListView.getSelectionModel().selectedItemProperty());
 
         BorderPane editorPane = new BorderPane();
         masterDetailPane.setCenter(editorPane);
@@ -321,7 +323,7 @@ public class SnakeJavafxApp extends Application {
             statisticsEatenData.clear();
         });
 
-        listView.getSelectionModel().select(0);
+        masterDeeplearningControllerListView.getSelectionModel().select(0);
 
         return masterDetailPane;
     }
@@ -388,7 +390,7 @@ public class SnakeJavafxApp extends Application {
             controller.save();
             controllerListProperty.add(controller);
             deeplearningControllerListProperty.add(controller);
-            deeplearningControllerProperty.set(controller);
+            masterDeeplearningControllerListView.getSelectionModel().select(controller);
         });
     }
 
