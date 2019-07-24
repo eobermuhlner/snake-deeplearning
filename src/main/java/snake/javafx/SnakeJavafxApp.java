@@ -28,6 +28,7 @@ import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.jetbrains.annotations.NotNull;
+import org.nd4j.linalg.activations.Activation;
 import snake.controller.*;
 import snake.domain.SnakeGame;
 import snake.domain.Tile;
@@ -36,7 +37,9 @@ import snake.wall.*;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.text.DecimalFormat;
+import java.text.FieldPosition;
 import java.text.Format;
+import java.text.ParsePosition;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +47,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SnakeJavafxApp extends Application {
 
     private static final DecimalFormat INTEGER_FORMAT = new DecimalFormat("##0");
+
+    private static final Format TOSTRING_FORMAT = new Format() {
+        @Override
+        public StringBuffer format(Object obj, @NotNull StringBuffer toAppendTo, @NotNull FieldPosition pos) {
+            return toAppendTo.append(obj);
+        }
+        @Override
+        public Object parseObject(String source, @NotNull ParsePosition pos) {
+            return null;
+        }
+    };
 
     private SnakeGame game;
 
@@ -200,10 +214,12 @@ public class SnakeJavafxApp extends Application {
 
         StringProperty nameProperty = new SimpleStringProperty();
         IntegerProperty inputWidthProperty = new SimpleIntegerProperty();
+        ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>();
 
         int rowIndex = 0;
         addLabel(propertiesPane, rowIndex++, "Name:", nameProperty);
-        addLabel(propertiesPane, rowIndex++, "InputWidth:", inputWidthProperty, INTEGER_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Input Width:", inputWidthProperty, INTEGER_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Output Activation:", outputActivationProperty, TOSTRING_FORMAT);
 
         addLabel(propertiesPane, rowIndex++, "");
         addComboBox(propertiesPane, rowIndex++, "Teacher:", controllerListProperty, trainTeacherControllerProperty);
@@ -283,6 +299,7 @@ public class SnakeJavafxApp extends Application {
         deeplearningControllerProperty.addListener((observable, oldValue, newValue) -> {
             nameProperty.set(newValue.toString());
             inputWidthProperty.set(newValue.getDeeplearningConfiguration().inputWidth);
+            outputActivationProperty.set(newValue.getDeeplearningConfiguration().outputActivation);
             epochProperty.setValue(0);
             scoreData.clear();
             statisticsDeadData.clear();
@@ -304,6 +321,9 @@ public class SnakeJavafxApp extends Application {
         StringProperty nameProperty = new SimpleStringProperty();
         ListProperty<Integer> inputWidthListProperty = new SimpleListProperty<>(FXCollections.observableArrayList());
         ObjectProperty<Integer> inputWidthProperty = new SimpleObjectProperty<>();
+        ListProperty<Activation> activationListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(Activation.values()));
+        ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>();
+        outputActivationProperty.setValue(Activation.SOFTMAX);
 
         for (int i = 3; i < 40; i+=2) {
             inputWidthListProperty.add(i);
@@ -311,9 +331,11 @@ public class SnakeJavafxApp extends Application {
 
         GridPane gridPane = new GridPane();
         dialog.getDialogPane().setContent(gridPane);
+
         int rowIndex = 0;
         TextField nameTextField = addTextField(gridPane, rowIndex++, "Name:", nameProperty);
         addComboBox(gridPane, rowIndex++, "Input Width:", inputWidthListProperty, inputWidthProperty);
+        addComboBox(gridPane, rowIndex++, "Output Activation:", activationListProperty, outputActivationProperty);
 
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okButton.setDisable(true);
@@ -323,7 +345,8 @@ public class SnakeJavafxApp extends Application {
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == ButtonType.OK) {
                 DeeplearningSnakeController.DeeplearningConfiguration configuration = new DeeplearningSnakeController.DeeplearningConfiguration(
-                        inputWidthProperty.get());
+                        inputWidthProperty.get(),
+                        outputActivationProperty.get());
                 return DeeplearningSnakeController.create(nameProperty.get(), configuration);
             }
             return null;
@@ -424,7 +447,9 @@ public class SnakeJavafxApp extends Application {
         gridPane.add(control, 1, rowIndex);
         Bindings.bindBidirectional(control.itemsProperty(), listProperty);
         control.valueProperty().bindBidirectional(elementProperty);
-        elementProperty.setValue(listProperty.get(0));
+        if (elementProperty.get() == null) {
+            elementProperty.setValue(listProperty.get(0));
+        }
         return control;
     }
 

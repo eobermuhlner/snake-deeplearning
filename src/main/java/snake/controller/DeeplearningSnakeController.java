@@ -211,13 +211,17 @@ public class DeeplearningSnakeController implements SnakeController {
             try {
                 GsonBuilder gsonBuilder = new GsonBuilder();
                 Gson gson = gsonBuilder.create();
-                return gson.fromJson(new FileReader(snakeFile), DeeplearningConfiguration.class);
+                DeeplearningConfiguration deeplearningConfiguration = gson.fromJson(new FileReader(snakeFile), DeeplearningConfiguration.class);
+                if (deeplearningConfiguration.outputActivation == null) {
+                    deeplearningConfiguration.outputActivation = Activation.SOFTMAX;
+                }
+                return deeplearningConfiguration;
             } catch (FileNotFoundException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        return new DeeplearningConfiguration(5);
+        return new DeeplearningConfiguration(5, Activation.SOFTMAX);
     }
 
     private static MultiLayerNetwork loadNetwork(String fileName, DeeplearningConfiguration deeplearningConfiguration) {
@@ -374,7 +378,7 @@ public class DeeplearningSnakeController implements SnakeController {
                 .layer(1, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
                 .layer(2, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
                 .layer(3, new OutputLayer.Builder().nIn(denseCount).nOut(OUTPUT_COUNT)
-                        .activation(Activation.SOFTMAX)
+                        .activation(deeplearningConfiguration.outputActivation)
                         .lossFunction(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                         .build())
                 .build();
@@ -398,12 +402,14 @@ public class DeeplearningSnakeController implements SnakeController {
 
     public static class DeeplearningConfiguration {
         public int inputWidth;
+        public Activation outputActivation;
 
         public DeeplearningConfiguration() {
         }
 
-        public DeeplearningConfiguration(int inputWidth) {
+        public DeeplearningConfiguration(int inputWidth, Activation outputActivation) {
             this.inputWidth = inputWidth;
+            this.outputActivation = outputActivation;
         }
     }
 }
