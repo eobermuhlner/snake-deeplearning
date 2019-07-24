@@ -198,19 +198,25 @@ public class SnakeJavafxApp extends Application {
         GridPane propertiesPane = new GridPane();
         editorPane.setLeft(propertiesPane);
 
-        int rowIndex = 0;
-        Label nameLabel = addLabel(propertiesPane, rowIndex++, "Name:");
+        StringProperty nameProperty = new SimpleStringProperty();
+        IntegerProperty inputWidthProperty = new SimpleIntegerProperty();
 
+        int rowIndex = 0;
+        addLabel(propertiesPane, rowIndex++, "Name:", nameProperty);
+        addLabel(propertiesPane, rowIndex++, "InputWidth:", inputWidthProperty, INTEGER_FORMAT);
+
+        addLabel(propertiesPane, rowIndex++, "");
         addComboBox(propertiesPane, rowIndex++, "Teacher:", controllerListProperty, trainTeacherControllerProperty);
         addComboBox(propertiesPane, rowIndex++, "Walls:", wallBuilderListProperty, trainWallBuilderProperty);
 
+        addLabel(propertiesPane, rowIndex++, "");
         Button startTrainButton = new Button("Start Training");
         propertiesPane.add(startTrainButton, 1, rowIndex);
         rowIndex++;
 
         Button stopTrainButton = new Button("Stop Training");
         propertiesPane.add(stopTrainButton, 1, rowIndex);
-        startTrainButton.setDisable(true);
+        stopTrainButton.setDisable(true);
         rowIndex++;
 
         Button saveButton = new Button("Save");
@@ -274,8 +280,9 @@ public class SnakeJavafxApp extends Application {
             saveButton.setDisable(false);
         });
 
-        deeplearningControllerProperty.addListener((observable, oldValue, newController) -> {
-            nameLabel.setText(newController.toString());
+        deeplearningControllerProperty.addListener((observable, oldValue, newValue) -> {
+            nameProperty.set(newValue.toString());
+            inputWidthProperty.set(newValue.getDeeplearningConfiguration().inputWidth);
             epochProperty.setValue(0);
             scoreData.clear();
             statisticsDeadData.clear();
@@ -295,11 +302,18 @@ public class SnakeJavafxApp extends Application {
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
         StringProperty nameProperty = new SimpleStringProperty();
+        ListProperty<Integer> inputWidthListProperty = new SimpleListProperty<>(FXCollections.observableArrayList());
+        ObjectProperty<Integer> inputWidthProperty = new SimpleObjectProperty<>();
+
+        for (int i = 3; i < 40; i+=2) {
+            inputWidthListProperty.add(i);
+        }
 
         GridPane gridPane = new GridPane();
         dialog.getDialogPane().setContent(gridPane);
         int rowIndex = 0;
         TextField nameTextField = addTextField(gridPane, rowIndex++, "Name:", nameProperty);
+        addComboBox(gridPane, rowIndex++, "Input Width:", inputWidthListProperty, inputWidthProperty);
 
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okButton.setDisable(true);
@@ -308,7 +322,9 @@ public class SnakeJavafxApp extends Application {
         });
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == ButtonType.OK) {
-                return DeeplearningSnakeController.create(nameProperty.get());
+                DeeplearningSnakeController.DeeplearningConfiguration configuration = new DeeplearningSnakeController.DeeplearningConfiguration(
+                        inputWidthProperty.get());
+                return DeeplearningSnakeController.create(nameProperty.get(), configuration);
             }
             return null;
         });

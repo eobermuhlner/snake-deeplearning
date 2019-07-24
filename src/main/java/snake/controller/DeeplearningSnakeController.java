@@ -382,6 +382,10 @@ public class DeeplearningSnakeController implements SnakeController {
         return network;
     }
 
+    public DeeplearningConfiguration getDeeplearningConfiguration() {
+        return deeplearningConfiguration;
+    }
+
     public static class Statistics {
         public final double dead;
         public final double eaten;
