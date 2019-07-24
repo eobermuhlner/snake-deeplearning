@@ -1,5 +1,7 @@
 package snake.controller;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
@@ -19,8 +21,7 @@ import snake.wall.DotsWallBuilder;
 import snake.wall.RandomCompositeWallBuilder;
 import snake.wall.WallBuilder;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -30,9 +31,6 @@ public class DeeplearningSnakeController implements SnakeController {
     private static final int LEFT = 2;
     private static final int RIGHT = 3;
 
-    private static final int INPUT_RADIUS = 3;
-    private static final int INPUT_WIDTH = 1 + 2 * INPUT_RADIUS;
-    private static final int INPUT_COUNT = INPUT_WIDTH * INPUT_WIDTH + 2;
     private static final int OUTPUT_COUNT = 4;
 
     private static final boolean PRINT_DEBUG = false;
@@ -56,23 +54,17 @@ public class DeeplearningSnakeController implements SnakeController {
 
     private final Random random = new Random();
     private final String name;
-    private MultiLayerNetwork model;
+    private final DeeplearningConfiguration deeplearningConfiguration;
+    private final MultiLayerNetwork model;
 
-    public DeeplearningSnakeController(String name) {
+    private DeeplearningSnakeController(String name, DeeplearningConfiguration deeplearningConfiguration, MultiLayerNetwork model) {
         this.name = name;
-        model = loadNetwork(toFileName());
-    }
-
-    private String toFileName() {
-        return name + ".dl4j";
+        this.deeplearningConfiguration = deeplearningConfiguration;
+        this.model = model;
     }
 
     public void save() {
-        try {
-            ModelSerializer.writeModel(model, toFileName(), true);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        save(name, deeplearningConfiguration, model);
     }
 
     @Override
@@ -80,20 +72,22 @@ public class DeeplearningSnakeController implements SnakeController {
         int x = snake.getX(0);
         int y = snake.getY(0);
 
-        double[] input = toInput(snake, snakeMap);
+        double[] input = toInput(deeplearningConfiguration, snake, snakeMap);
         INDArray inputArray = Nd4j.create(input);
 
         INDArray outputArray = model.output(inputArray);
         Move move = pickMove(outputArray);
 
         if (PRINT_DEBUG) {
+            int inputWidth = deeplearningConfiguration.inputWidth;
+            int inputRadius = inputWidth / 2;
             if (!Tile.isValidMove(snakeMap.get(x + move.dX, y + move.dY))) {
                 System.out.println("INVALID " + move);
                 System.out.println("  input =" + inputArray);
                 System.out.println("  output=" + outputArray);
-                for (int inputY = 0; inputY < INPUT_WIDTH; inputY++) {
-                    for (int inputX = 0; inputX < INPUT_WIDTH; inputX++) {
-                        System.out.print(snakeMap.get(x + (inputX - INPUT_RADIUS), y + (inputY - INPUT_RADIUS)).tileChar);
+                for (int inputY = 0; inputY < inputWidth; inputY++) {
+                    for (int inputX = 0; inputX < inputWidth; inputX++) {
+                        System.out.print(snakeMap.get(x + (inputX - inputRadius), y + (inputY - inputRadius)).tileChar);
                     }
                     System.out.println();
                 }
@@ -130,7 +124,7 @@ public class DeeplearningSnakeController implements SnakeController {
 
     public double train(int n, SnakeController teacher, WallBuilder wallBuilder) {
         for (int i = 0; i < n; i++) {
-            List<DataSet> dataSets = createGameDataSets(teacher, wallBuilder);
+            List<DataSet> dataSets = createGameDataSets(deeplearningConfiguration, teacher, wallBuilder);
 
             if (!dataSets.isEmpty()) {
                 DataSet dataSet = DataSet.merge(dataSets);
@@ -177,12 +171,61 @@ public class DeeplearningSnakeController implements SnakeController {
         return "AI " + name;
     }
 
-    private static MultiLayerNetwork loadNetwork(String fileName) {
+    public static DeeplearningSnakeController create(String name) {
+        String snakeFileName = name + ".snake";
+
+        DeeplearningConfiguration deeplearningConfiguration = loadDeeplearningConfiguration(snakeFileName);
+        return create(name, deeplearningConfiguration);
+    }
+
+    public static DeeplearningSnakeController create(String name, DeeplearningConfiguration deeplearningConfiguration) {
+        String dl4jFileName = name + ".dl4j";
+        MultiLayerNetwork model = loadNetwork(dl4jFileName, deeplearningConfiguration);
+
+        return new DeeplearningSnakeController(name, deeplearningConfiguration, model);
+    }
+
+    private static void save(String name, DeeplearningConfiguration deeplearningConfiguration, MultiLayerNetwork model) {
+        String snakeFileName = name + ".snake";
+        GsonBuilder gsonBuilder = new GsonBuilder();
+        Gson gson = gsonBuilder.create();
+        String json = gson.toJson(deeplearningConfiguration);
+
+        try (FileWriter writer = new FileWriter(snakeFileName)) {
+            writer.write(json);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        String dl4jFileName = name + ".dl4j";
+        try {
+            ModelSerializer.writeModel(model, dl4jFileName, true);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static DeeplearningConfiguration loadDeeplearningConfiguration(String snakeFileName) {
+        File snakeFile = new File(snakeFileName);
+        if (snakeFile.exists()) {
+            try {
+                GsonBuilder gsonBuilder = new GsonBuilder();
+                Gson gson = gsonBuilder.create();
+                return gson.fromJson(new FileReader(snakeFile), DeeplearningConfiguration.class);
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        return new DeeplearningConfiguration(5);
+    }
+
+    private static MultiLayerNetwork loadNetwork(String fileName, DeeplearningConfiguration deeplearningConfiguration) {
         try {
             if (new File(fileName).exists()) {
                 return ModelSerializer.restoreMultiLayerNetwork(fileName);
             } else {
-                MultiLayerNetwork model = createNetwork();
+                MultiLayerNetwork model = createNetwork(deeplearningConfiguration);
                 model.init();
                 return model;
             }
@@ -204,7 +247,7 @@ public class DeeplearningSnakeController implements SnakeController {
     }
 
     public static void train(String name, SnakeController teacher, long seconds) throws IOException, InterruptedException {
-        DeeplearningSnakeController deeplearningSnakeController = new DeeplearningSnakeController(name);
+        DeeplearningSnakeController deeplearningSnakeController = create(name);
         WallBuilder wallBuilder = new RandomCompositeWallBuilder();
 
         if (teacher == null) {
@@ -227,8 +270,8 @@ public class DeeplearningSnakeController implements SnakeController {
         deeplearningSnakeController.save();
     }
 
-    private static List<DataSet> createGameDataSets(SnakeController controller, WallBuilder wallBuilder) {
-        return createGameDataSets(() -> {
+    private static List<DataSet> createGameDataSets(DeeplearningConfiguration deeplearningConfiguration, SnakeController controller, WallBuilder wallBuilder) {
+        return createGameDataSets(deeplearningConfiguration, () -> {
             Random random = new Random();
             int width = random.nextInt(10) + 5;
             int height = random.nextInt(10) + 5;
@@ -237,7 +280,7 @@ public class DeeplearningSnakeController implements SnakeController {
         });
     }
 
-    private static List<DataSet> createGameDataSets(Supplier<SnakeGame> gameCreator) {
+    private static List<DataSet> createGameDataSets(DeeplearningConfiguration deeplearningConfiguration, Supplier<SnakeGame> gameCreator) {
         List<DataSet> resultDataSets = new ArrayList<>();
 
         SnakeGame game = null;
@@ -251,7 +294,7 @@ public class DeeplearningSnakeController implements SnakeController {
             int stepCounter = 0;
             do {
                 stepCounter++;
-                double[] input = toInput(game);
+                double[] input = toInput(deeplearningConfiguration, game);
                 game.step();
                 if (game.snake.alive) {
                     int outputLabel = game.getMove().ordinal();
@@ -273,11 +316,11 @@ public class DeeplearningSnakeController implements SnakeController {
         return resultDataSets;
     }
 
-    private static double[] toInput(SnakeGame game) {
-        return toInput(game.snake, game.snakeMap);
+    private static double[] toInput(DeeplearningConfiguration deeplearningConfiguration, SnakeGame game) {
+        return toInput(deeplearningConfiguration, game.snake, game.snakeMap);
     }
 
-    private static double[] toInput(Snake snake, SnakeMap snakeMap) {
+    private static double[] toInput(DeeplearningConfiguration deeplearningConfiguration, Snake snake, SnakeMap snakeMap) {
         int x = snake.getX(0);
         int y = snake.getY(0);
 
@@ -289,14 +332,17 @@ public class DeeplearningSnakeController implements SnakeController {
         double relDirectionAppleX = (double)directionAppleX / snakeMap.width;
         double relDirectionAppleY = (double)directionAppleY / snakeMap.height;
 
-        double[] input = new double[INPUT_COUNT];
-        for (int inputY = 0; inputY < INPUT_WIDTH; inputY++) {
-            for (int inputX = 0; inputX < INPUT_WIDTH; inputX++) {
-                input[inputX + inputY * INPUT_WIDTH] = tileToInput.get(snakeMap.get(x + (inputX - INPUT_RADIUS), y + (inputY - INPUT_RADIUS)));
+        int inputWidth = deeplearningConfiguration.inputWidth;
+        int inputRadius = inputWidth / 2;
+        int inputCount = inputWidth * inputWidth + 2;
+        double[] input = new double[inputCount];
+        for (int inputY = 0; inputY < inputWidth; inputY++) {
+            for (int inputX = 0; inputX < inputWidth; inputX++) {
+                input[inputX + inputY * inputWidth] = tileToInput.get(snakeMap.get(x + (inputX - inputRadius), y + (inputY - inputRadius)));
             }
         }
-        input[INPUT_COUNT - 2] = relDirectionAppleX;
-        input[INPUT_COUNT - 1] = relDirectionAppleY;
+        input[inputCount - 2] = relDirectionAppleX;
+        input[inputCount - 1] = relDirectionAppleY;
         return input;
     }
 
@@ -311,8 +357,10 @@ public class DeeplearningSnakeController implements SnakeController {
         return new DataSet(inputArray, outputArray);
     }
 
-    private static MultiLayerNetwork createNetwork() {
-        final int denseCount = INPUT_COUNT;
+    private static MultiLayerNetwork createNetwork(DeeplearningConfiguration deeplearningConfiguration) {
+        final int inputWidth = deeplearningConfiguration.inputWidth;
+        final int inputCount = inputWidth * inputWidth + 2;
+        final int denseCount = deeplearningConfiguration.inputWidth;
         MultiLayerConfiguration configuration = new NeuralNetConfiguration.Builder()
                 .seed(123)
                 .l2(0.0001)
@@ -322,7 +370,7 @@ public class DeeplearningSnakeController implements SnakeController {
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .updater(new AdaDelta())
                 .list()
-                .layer(0, new DenseLayer.Builder().nIn(INPUT_COUNT).nOut(denseCount).build())
+                .layer(0, new DenseLayer.Builder().nIn(inputCount).nOut(denseCount).build())
                 .layer(1, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
                 .layer(2, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
                 .layer(3, new OutputLayer.Builder().nIn(denseCount).nOut(OUTPUT_COUNT)
@@ -341,6 +389,17 @@ public class DeeplearningSnakeController implements SnakeController {
         public Statistics(double dead, double eaten) {
             this.dead = dead;
             this.eaten = eaten;
+        }
+    }
+
+    public static class DeeplearningConfiguration {
+        public int inputWidth;
+
+        public DeeplearningConfiguration() {
+        }
+
+        public DeeplearningConfiguration(int inputWidth) {
+            this.inputWidth = inputWidth;
         }
     }
 }

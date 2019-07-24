@@ -165,13 +165,13 @@ public class SnakeJavafxApp extends Application {
         File dir = new File(".");
         File[] files = dir.listFiles(new FilenameFilter() {
             public boolean accept(File dir, String name) {
-                return name.toLowerCase().endsWith(".dl4j");
+                return name.toLowerCase().endsWith(".snake");
             }
         });
         for (File file : files) {
             String name = file.getName();
-            name = name.substring(0, name.length() - ".dl4j".length());
-            DeeplearningSnakeController controller = new DeeplearningSnakeController(name);
+            name = name.substring(0, name.length() - ".snake".length());
+            DeeplearningSnakeController controller = DeeplearningSnakeController.create(name);
 
             controllerListProperty.add(controller);
             deeplearningControllerListProperty.add(controller);
@@ -183,7 +183,7 @@ public class SnakeJavafxApp extends Application {
 
         HBox toolbar = new HBox();
         masterDetailPane.setTop(toolbar);
-        Button newButton = new Button("New");
+        Button newButton = new Button("New AI");
         toolbar.getChildren().add(newButton);
 
         ListView<DeeplearningSnakeController> listView = new ListView<>();
@@ -210,6 +210,7 @@ public class SnakeJavafxApp extends Application {
 
         Button stopTrainButton = new Button("Stop Training");
         propertiesPane.add(stopTrainButton, 1, rowIndex);
+        startTrainButton.setDisable(true);
         rowIndex++;
 
         Button saveButton = new Button("Save");
@@ -298,7 +299,7 @@ public class SnakeJavafxApp extends Application {
         GridPane gridPane = new GridPane();
         dialog.getDialogPane().setContent(gridPane);
         int rowIndex = 0;
-        addTextField(gridPane, rowIndex++, "Name:", nameProperty);
+        TextField nameTextField = addTextField(gridPane, rowIndex++, "Name:", nameProperty);
 
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okButton.setDisable(true);
@@ -307,10 +308,11 @@ public class SnakeJavafxApp extends Application {
         });
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == ButtonType.OK) {
-                return new DeeplearningSnakeController(nameProperty.get());
+                return DeeplearningSnakeController.create(nameProperty.get());
             }
             return null;
         });
+        nameTextField.requestFocus();
 
         Optional<DeeplearningSnakeController> result = dialog.showAndWait();
         result.ifPresent(controller -> {
