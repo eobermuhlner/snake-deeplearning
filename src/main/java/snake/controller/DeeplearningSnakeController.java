@@ -15,6 +15,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.AdaDelta;
+import org.nd4j.linalg.lossfunctions.ILossFunction;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 import snake.domain.*;
 import snake.wall.DotsWallBuilder;
@@ -212,16 +213,13 @@ public class DeeplearningSnakeController implements SnakeController {
                 GsonBuilder gsonBuilder = new GsonBuilder();
                 Gson gson = gsonBuilder.create();
                 DeeplearningConfiguration deeplearningConfiguration = gson.fromJson(new FileReader(snakeFile), DeeplearningConfiguration.class);
-                if (deeplearningConfiguration.outputActivation == null) {
-                    deeplearningConfiguration.outputActivation = Activation.SOFTMAX;
-                }
                 return deeplearningConfiguration;
             } catch (FileNotFoundException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        return new DeeplearningConfiguration(5, Activation.SOFTMAX);
+        return new DeeplearningConfiguration();
     }
 
     private static MultiLayerNetwork loadNetwork(String fileName, DeeplearningConfiguration deeplearningConfiguration) {
@@ -369,8 +367,8 @@ public class DeeplearningSnakeController implements SnakeController {
                 .seed(123)
                 .l2(0.0001)
                 .miniBatch(true)
-                .activation(Activation.RELU)
-                .weightInit(WeightInit.XAVIER)
+                .activation(deeplearningConfiguration.defaultActivation)
+                .weightInit(deeplearningConfiguration.defaultWeightInit)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .updater(new AdaDelta())
                 .list()
@@ -379,7 +377,7 @@ public class DeeplearningSnakeController implements SnakeController {
                 .layer(2, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
                 .layer(3, new OutputLayer.Builder().nIn(denseCount).nOut(OUTPUT_COUNT)
                         .activation(deeplearningConfiguration.outputActivation)
-                        .lossFunction(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                        .lossFunction(deeplearningConfiguration.outputLossFunction)
                         .build())
                 .build();
         MultiLayerNetwork network = new MultiLayerNetwork(configuration);
@@ -401,15 +399,15 @@ public class DeeplearningSnakeController implements SnakeController {
     }
 
     public static class DeeplearningConfiguration {
-        public int inputWidth;
-        public Activation outputActivation;
+        public int inputWidth = 5;
+
+        public Activation defaultActivation = Activation.RELU;
+        public WeightInit defaultWeightInit = WeightInit.XAVIER;
+
+        public Activation outputActivation = Activation.SOFTMAX;
+        public LossFunctions.LossFunction outputLossFunction = LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD;
 
         public DeeplearningConfiguration() {
-        }
-
-        public DeeplearningConfiguration(int inputWidth, Activation outputActivation) {
-            this.inputWidth = inputWidth;
-            this.outputActivation = outputActivation;
         }
     }
 }

@@ -27,8 +27,10 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.deeplearning4j.nn.weights.WeightInit;
 import org.jetbrains.annotations.NotNull;
 import org.nd4j.linalg.activations.Activation;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
 import snake.controller.*;
 import snake.domain.SnakeGame;
 import snake.domain.Tile;
@@ -210,16 +212,24 @@ public class SnakeJavafxApp extends Application {
 
         // properties pane
         GridPane propertiesPane = new GridPane();
+        propertiesPane.setHgap(4);
+        propertiesPane.setHgap(4);
         editorPane.setLeft(propertiesPane);
 
         StringProperty nameProperty = new SimpleStringProperty();
         IntegerProperty inputWidthProperty = new SimpleIntegerProperty();
+        ObjectProperty<WeightInit> defaultWeightInitProperty = new SimpleObjectProperty<>();
+        ObjectProperty<Activation> defaultActivationProperty = new SimpleObjectProperty<>();
         ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>();
+        ObjectProperty<LossFunctions.LossFunction> outputLossFunctionProperty = new SimpleObjectProperty<>();
 
         int rowIndex = 0;
         addLabel(propertiesPane, rowIndex++, "Name:", nameProperty);
         addLabel(propertiesPane, rowIndex++, "Input Width:", inputWidthProperty, INTEGER_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Default Weight Init:", defaultWeightInitProperty, TOSTRING_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Default Activation:", defaultActivationProperty, TOSTRING_FORMAT);
         addLabel(propertiesPane, rowIndex++, "Output Activation:", outputActivationProperty, TOSTRING_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Output Loss Function:", outputLossFunctionProperty, TOSTRING_FORMAT);
 
         addLabel(propertiesPane, rowIndex++, "");
         addComboBox(propertiesPane, rowIndex++, "Teacher:", controllerListProperty, trainTeacherControllerProperty);
@@ -298,8 +308,13 @@ public class SnakeJavafxApp extends Application {
 
         deeplearningControllerProperty.addListener((observable, oldValue, newValue) -> {
             nameProperty.set(newValue.toString());
+
             inputWidthProperty.set(newValue.getDeeplearningConfiguration().inputWidth);
+            defaultWeightInitProperty.set(newValue.getDeeplearningConfiguration().defaultWeightInit);
+            defaultActivationProperty.set(newValue.getDeeplearningConfiguration().defaultActivation);
             outputActivationProperty.set(newValue.getDeeplearningConfiguration().outputActivation);
+            outputLossFunctionProperty.set(newValue.getDeeplearningConfiguration().outputLossFunction);
+
             epochProperty.setValue(0);
             scoreData.clear();
             statisticsDeadData.clear();
@@ -318,24 +333,36 @@ public class SnakeJavafxApp extends Application {
 
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
+        DeeplearningSnakeController.DeeplearningConfiguration defaultConfiguration = new DeeplearningSnakeController.DeeplearningConfiguration();
+
         StringProperty nameProperty = new SimpleStringProperty();
         ListProperty<Integer> inputWidthListProperty = new SimpleListProperty<>(FXCollections.observableArrayList());
-        ObjectProperty<Integer> inputWidthProperty = new SimpleObjectProperty<>();
         ListProperty<Activation> activationListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(Activation.values()));
-        ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>();
-        outputActivationProperty.setValue(Activation.SOFTMAX);
+        ListProperty<WeightInit> weightInitListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(WeightInit.values()));
+        ListProperty<LossFunctions.LossFunction> lossFunctionListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(LossFunctions.LossFunction.values()));
+
+        ObjectProperty<Integer> inputWidthProperty = new SimpleObjectProperty<>(defaultConfiguration.inputWidth);
+        ObjectProperty<Activation> defaultActivationProperty = new SimpleObjectProperty<>(defaultConfiguration.defaultActivation);
+        ObjectProperty<WeightInit> defaultWeightInitProperty = new SimpleObjectProperty<>(defaultConfiguration.defaultWeightInit);
+        ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>(defaultConfiguration.outputActivation);
+        ObjectProperty<LossFunctions.LossFunction> outputLossFunctionProperty = new SimpleObjectProperty<>(defaultConfiguration.outputLossFunction);
 
         for (int i = 3; i < 40; i+=2) {
             inputWidthListProperty.add(i);
         }
 
         GridPane gridPane = new GridPane();
+        gridPane.setHgap(4);
+        gridPane.setHgap(4);
         dialog.getDialogPane().setContent(gridPane);
 
         int rowIndex = 0;
         TextField nameTextField = addTextField(gridPane, rowIndex++, "Name:", nameProperty);
         addComboBox(gridPane, rowIndex++, "Input Width:", inputWidthListProperty, inputWidthProperty);
+        addComboBox(gridPane, rowIndex++, "Default Activation:", activationListProperty, defaultActivationProperty);
+        addComboBox(gridPane, rowIndex++, "Default Weight Init:", weightInitListProperty, defaultWeightInitProperty);
         addComboBox(gridPane, rowIndex++, "Output Activation:", activationListProperty, outputActivationProperty);
+        addComboBox(gridPane, rowIndex++, "Output Loss Function:", lossFunctionListProperty, outputLossFunctionProperty);
 
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okButton.setDisable(true);
@@ -344,9 +371,12 @@ public class SnakeJavafxApp extends Application {
         });
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == ButtonType.OK) {
-                DeeplearningSnakeController.DeeplearningConfiguration configuration = new DeeplearningSnakeController.DeeplearningConfiguration(
-                        inputWidthProperty.get(),
-                        outputActivationProperty.get());
+                DeeplearningSnakeController.DeeplearningConfiguration configuration = new DeeplearningSnakeController.DeeplearningConfiguration();
+                configuration.inputWidth = inputWidthProperty.get();
+                configuration.defaultActivation = defaultActivationProperty.get();
+                configuration.defaultWeightInit = defaultWeightInitProperty.get();
+                configuration.outputActivation = outputActivationProperty.get();
+                configuration.outputLossFunction = outputLossFunctionProperty.get();
                 return DeeplearningSnakeController.create(nameProperty.get(), configuration);
             }
             return null;
@@ -404,6 +434,9 @@ public class SnakeJavafxApp extends Application {
 
     private Node createPropertiesPane() {
         GridPane propertiesPane = new GridPane();
+        propertiesPane.setHgap(4);
+        propertiesPane.setHgap(4);
+
         int rowIndex = 0;
 
         addLabel(propertiesPane, rowIndex++, "Status:", statusProperty);
