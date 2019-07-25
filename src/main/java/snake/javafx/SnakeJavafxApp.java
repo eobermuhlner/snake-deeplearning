@@ -478,11 +478,16 @@ public class SnakeJavafxApp extends Application {
     private void reduceDataToStep(ObservableList<XYChart.Data<Number, Number>> data, int reduceToStep) {
         Iterator<XYChart.Data<Number, Number>> iterator = data.iterator();
         Double maxYValue = null;
+        Double minYValue = null;
         while (iterator.hasNext()) {
             XYChart.Data<Number, Number> singleData = iterator.next();
             double yValue = singleData.getYValue().doubleValue();
             maxYValue = maxYValue == null ? yValue : Math.max(maxYValue, yValue);
-            if (singleData.getXValue().intValue() % reduceToStep == 0) {
+            minYValue = minYValue == null ? yValue : Math.min(minYValue, yValue);
+            if (singleData.getXValue().intValue() % reduceToStep == reduceToStep - 1) {
+                singleData.setYValue(minYValue);
+                minYValue = null;
+            } else if (singleData.getXValue().intValue() % reduceToStep == 0) {
                 singleData.setYValue(maxYValue);
                 maxYValue = null;
             } else {
