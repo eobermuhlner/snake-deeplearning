@@ -64,6 +64,10 @@ public class DeeplearningSnakeController implements SnakeController {
         this.model = model;
     }
 
+    public String getName() {
+        return name;
+    }
+
     public void save() {
         save(name, deeplearningConfiguration, model);
     }
@@ -188,11 +192,12 @@ public class DeeplearningSnakeController implements SnakeController {
 
     private static void save(String name, DeeplearningConfiguration deeplearningConfiguration, MultiLayerNetwork model) {
         String snakeFileName = name + ".snake";
-        GsonBuilder gsonBuilder = new GsonBuilder();
-        Gson gson = gsonBuilder.create();
-        String json = gson.toJson(deeplearningConfiguration);
 
         try (FileWriter writer = new FileWriter(snakeFileName)) {
+            GsonBuilder gsonBuilder = new GsonBuilder();
+            Gson gson = gsonBuilder.create();
+            String json = gson.toJson(deeplearningConfiguration);
+
             writer.write(json);
         } catch (IOException e) {
             throw new RuntimeException(e);

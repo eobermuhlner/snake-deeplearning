@@ -1,5 +1,7 @@
 package snake.javafx;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
@@ -36,13 +38,14 @@ import snake.domain.SnakeGame;
 import snake.domain.Tile;
 import snake.wall.*;
 
-import java.io.File;
-import java.io.FilenameFilter;
+import java.io.*;
 import java.text.DecimalFormat;
 import java.text.FieldPosition;
 import java.text.Format;
 import java.text.ParsePosition;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -305,6 +308,7 @@ public class SnakeJavafxApp extends Application {
             saveButton.setDisable(true);
             DeeplearningSnakeController controller = deeplearningControllerProperty.get();
             controller.save();
+            saveTraining(controller.getName(), epochProperty.get(), scoreData, statisticsDeadData, statisticsEatenData);
             saveButton.setDisable(false);
         });
 
@@ -317,15 +321,50 @@ public class SnakeJavafxApp extends Application {
             outputActivationProperty.set(newValue.getDeeplearningConfiguration().outputActivation);
             outputLossFunctionProperty.set(newValue.getDeeplearningConfiguration().outputLossFunction);
 
-            epochProperty.setValue(0);
-            scoreData.clear();
-            statisticsDeadData.clear();
-            statisticsEatenData.clear();
+            TrainingData trainingData = loadTrainingData(newValue.getName());
+            epochProperty.setValue(trainingData.epoch);
+            trainingData.fillScoreDataInto(scoreData);
+            trainingData.fillStatisticsDeadDataDataInto(statisticsDeadData);
+            trainingData.fillStatisticsEatenDataDataInto(statisticsEatenData);
         });
 
         masterDeeplearningControllerListView.getSelectionModel().select(0);
 
         return masterDetailPane;
+    }
+
+    private void saveTraining(String name, int epoch, ObservableList<XYChart.Data<Number, Number>> scoreData, ObservableList<XYChart.Data<Number, Number>> statisticsDeadData, ObservableList<XYChart.Data<Number, Number>> statisticsEatenData) {
+        String trainFileName = name + ".train";
+
+        try (FileWriter writer = new FileWriter(trainFileName)) {
+            TrainingData trainingData = new TrainingData(epoch, scoreData, statisticsDeadData, statisticsEatenData);
+
+            GsonBuilder gsonBuilder = new GsonBuilder();
+            Gson gson = gsonBuilder.create();
+            String json = gson.toJson(trainingData);
+
+            writer.write(json);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private TrainingData loadTrainingData(String name) {
+        String trainFileName = name + ".train";
+
+        File trainFile = new File(trainFileName);
+        if (trainFile.exists()) {
+            try {
+                GsonBuilder gsonBuilder = new GsonBuilder();
+                Gson gson = gsonBuilder.create();
+                TrainingData trainingData = gson.fromJson(new FileReader(trainFile), TrainingData.class);
+                return trainingData;
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        return new TrainingData();
     }
 
     private void showNewAiDialog() {
@@ -590,5 +629,55 @@ public class SnakeJavafxApp extends Application {
 
     public static void main(String[] args) {
         launch(args);
+    }
+
+    public static class TrainingData {
+        public int epoch;
+        public Map<Double, Double> scoreData;
+        public Map<Double, Double> statisticsDeadData;
+        public Map<Double, Double> statisticsEatenData;
+
+        public TrainingData() {
+            // empty
+        }
+
+        public TrainingData(int epoch, ObservableList<XYChart.Data<Number, Number>> scoreData, ObservableList<XYChart.Data<Number, Number>> statisticsDeadData, ObservableList<XYChart.Data<Number, Number>> statisticsEatenData) {
+            this.epoch = epoch;
+            this.scoreData = toMapDoubleDouble(scoreData);
+            this.statisticsDeadData = toMapDoubleDouble(statisticsDeadData);
+            this.statisticsEatenData = toMapDoubleDouble(statisticsEatenData);
+        }
+
+        public void fillScoreDataInto(ObservableList<XYChart.Data<Number, Number>> data) {
+            fillMapInto(scoreData, data);
+        }
+
+        public void fillStatisticsDeadDataDataInto(ObservableList<XYChart.Data<Number, Number>> data) {
+            fillMapInto(statisticsDeadData, data);
+        }
+
+        public void fillStatisticsEatenDataDataInto(ObservableList<XYChart.Data<Number, Number>> data) {
+            fillMapInto(statisticsEatenData, data);
+        }
+
+        private Map<Double, Double> toMapDoubleDouble(ObservableList<XYChart.Data<Number, Number>> data) {
+            HashMap<Double, Double> map = new HashMap<>();
+
+            for (XYChart.Data<Number, Number> datum : data) {
+                map.put(datum.getXValue().doubleValue(), datum.getYValue().doubleValue());
+            }
+
+            return map;
+        }
+
+        private void fillMapInto(Map<Double, Double> map, ObservableList<XYChart.Data<Number, Number>> data) {
+            data.clear();
+            if (map != null) {
+                for (Map.Entry<Double, Double> entry : map.entrySet()) {
+                    data.add(new XYChart.Data<>(entry.getKey(), entry.getValue()));
+                }
+            }
+        }
+
     }
 }
