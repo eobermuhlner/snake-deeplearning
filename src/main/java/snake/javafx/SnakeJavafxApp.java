@@ -48,6 +48,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 public class SnakeJavafxApp extends Application {
 
@@ -282,15 +283,9 @@ public class SnakeJavafxApp extends Application {
                         scoreData.add(new XYChart.Data<>(epoch, score));
                         statisticsDeadData.add(new XYChart.Data<>(epoch, statistics.dead * 100));
                         statisticsEatenData.add(new XYChart.Data<>(epoch, statistics.eaten * 100));
-                        if (epoch % 10000 == 0) {
-                            reduceData(scoreData, 100);
-                            reduceData(statisticsDeadData, 100);
-                            reduceData(statisticsEatenData, 100);
-                        } else if (epoch % 1000 == 0) {
-                            reduceData(scoreData, 10);
-                            reduceData(statisticsDeadData, 10);
-                            reduceData(statisticsEatenData, 10);
-                        }
+                        reduceData(scoreData, epoch);
+                        reduceData(statisticsDeadData, epoch);
+                        reduceData(statisticsEatenData, epoch);
 
                         epochProperty.setValue(epoch + 1);
                     });
@@ -387,6 +382,7 @@ public class SnakeJavafxApp extends Application {
         ObjectProperty<WeightInit> defaultWeightInitProperty = new SimpleObjectProperty<>(defaultConfiguration.defaultWeightInit);
         ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>(defaultConfiguration.outputActivation);
         ObjectProperty<LossFunctions.LossFunction> outputLossFunctionProperty = new SimpleObjectProperty<>(defaultConfiguration.outputLossFunction);
+        StringProperty messageProperty = new SimpleStringProperty();
 
         for (int i = 3; i < 40; i+=2) {
             inputWidthListProperty.add(i);
@@ -404,21 +400,58 @@ public class SnakeJavafxApp extends Application {
         addComboBox(gridPane, rowIndex++, "Default Weight Init:", weightInitListProperty, defaultWeightInitProperty);
         addComboBox(gridPane, rowIndex++, "Output Activation:", activationListProperty, outputActivationProperty);
         addComboBox(gridPane, rowIndex++, "Output Loss Function:", lossFunctionListProperty, outputLossFunctionProperty);
+        addTextArea(gridPane, rowIndex++, "Message:", messageProperty);
 
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okButton.setDisable(true);
+
+        Supplier<DeeplearningSnakeController> createDeeplearningSnakeController = () -> {
+            DeeplearningSnakeController.DeeplearningConfiguration configuration = new DeeplearningSnakeController.DeeplearningConfiguration();
+            configuration.inputWidth = inputWidthProperty.get();
+            configuration.defaultActivation = defaultActivationProperty.get();
+            configuration.defaultWeightInit = defaultWeightInitProperty.get();
+            configuration.outputActivation = outputActivationProperty.get();
+            configuration.outputLossFunction = outputLossFunctionProperty.get();
+            return DeeplearningSnakeController.create(nameProperty.get(), configuration);
+        };
+
+        Supplier<String> getValidatorMessage = () -> {
+            String name = nameProperty.get();
+            if (name == null || name.isEmpty()) {
+                return "Provide a name.";
+            }
+            if (new File(name + ".snake").exists()) {
+                return "AI named '" + name + "' exists already.";
+            }
+            try {
+                createDeeplearningSnakeController.get();
+            } catch (Exception e) {
+                return e.getMessage();
+            }
+            return null;
+        };
+        Runnable validator = () -> {
+            String validatorMessage = getValidatorMessage.get();
+            if (validatorMessage == null) {
+                okButton.setDisable(false);
+                messageProperty.set("");
+            } else {
+                okButton.setDisable(true);
+                messageProperty.set(validatorMessage);
+            }
+        };
         nameProperty.addListener((observable, oldValue, newValue) -> {
-            okButton.setDisable(newValue.trim().isEmpty());
+            validator.run();
+        });
+        outputActivationProperty.addListener((observable, oldValue, newValue) -> {
+            validator.run();
+        });
+        outputLossFunctionProperty.addListener((observable, oldValue, newValue) -> {
+            validator.run();
         });
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == ButtonType.OK) {
-                DeeplearningSnakeController.DeeplearningConfiguration configuration = new DeeplearningSnakeController.DeeplearningConfiguration();
-                configuration.inputWidth = inputWidthProperty.get();
-                configuration.defaultActivation = defaultActivationProperty.get();
-                configuration.defaultWeightInit = defaultWeightInitProperty.get();
-                configuration.outputActivation = outputActivationProperty.get();
-                configuration.outputLossFunction = outputLossFunctionProperty.get();
-                return DeeplearningSnakeController.create(nameProperty.get(), configuration);
+                return createDeeplearningSnakeController.get();
             }
             return null;
         });
@@ -433,14 +466,23 @@ public class SnakeJavafxApp extends Application {
         });
     }
 
-    private void reduceData(ObservableList<XYChart.Data<Number, Number>> data, int reduceToStep) {
+    private void reduceData(ObservableList<XYChart.Data<Number, Number>> data, int epoch) {
+        for (int step = 100000 ; step >= 1000 ; step /= 10) {
+            if (epoch >= step && epoch % step == 0) {
+                reduceDataToStep(data, step / 100);
+                return;
+            }
+        }
+    }
+
+    private void reduceDataToStep(ObservableList<XYChart.Data<Number, Number>> data, int reduceToStep) {
         Iterator<XYChart.Data<Number, Number>> iterator = data.iterator();
         Double maxYValue = null;
         while (iterator.hasNext()) {
             XYChart.Data<Number, Number> singleData = iterator.next();
             double yValue = singleData.getYValue().doubleValue();
             maxYValue = maxYValue == null ? yValue : Math.max(maxYValue, yValue);
-            if ((int)singleData.getXValue() % reduceToStep == 0) {
+            if (singleData.getXValue().intValue() % reduceToStep == 0) {
                 singleData.setYValue(maxYValue);
                 maxYValue = null;
             } else {
@@ -510,6 +552,14 @@ public class SnakeJavafxApp extends Application {
     private TextField addTextField(GridPane gridPane, int rowIndex, String label, StringProperty property) {
         gridPane.add(new Label(label), 0, rowIndex);
         TextField control = new TextField();
+        gridPane.add(control, 1, rowIndex);
+        Bindings.bindBidirectional(control.textProperty(), property);
+        return control;
+    }
+
+    private TextArea addTextArea(GridPane gridPane, int rowIndex, String label, StringProperty property) {
+        gridPane.add(new Label(label), 0, rowIndex);
+        TextArea control = new TextArea();
         gridPane.add(control, 1, rowIndex);
         Bindings.bindBidirectional(control.textProperty(), property);
         return control;
@@ -633,9 +683,9 @@ public class SnakeJavafxApp extends Application {
 
     public static class TrainingData {
         public int epoch;
-        public Map<Double, Double> scoreData;
-        public Map<Double, Double> statisticsDeadData;
-        public Map<Double, Double> statisticsEatenData;
+        public Map<Integer, Double> scoreData;
+        public Map<Integer, Double> statisticsDeadData;
+        public Map<Integer, Double> statisticsEatenData;
 
         public TrainingData() {
             // empty
@@ -643,9 +693,9 @@ public class SnakeJavafxApp extends Application {
 
         public TrainingData(int epoch, ObservableList<XYChart.Data<Number, Number>> scoreData, ObservableList<XYChart.Data<Number, Number>> statisticsDeadData, ObservableList<XYChart.Data<Number, Number>> statisticsEatenData) {
             this.epoch = epoch;
-            this.scoreData = toMapDoubleDouble(scoreData);
-            this.statisticsDeadData = toMapDoubleDouble(statisticsDeadData);
-            this.statisticsEatenData = toMapDoubleDouble(statisticsEatenData);
+            this.scoreData = toMapIntegerDouble(scoreData);
+            this.statisticsDeadData = toMapIntegerDouble(statisticsDeadData);
+            this.statisticsEatenData = toMapIntegerDouble(statisticsEatenData);
         }
 
         public void fillScoreDataInto(ObservableList<XYChart.Data<Number, Number>> data) {
@@ -660,20 +710,20 @@ public class SnakeJavafxApp extends Application {
             fillMapInto(statisticsEatenData, data);
         }
 
-        private Map<Double, Double> toMapDoubleDouble(ObservableList<XYChart.Data<Number, Number>> data) {
-            HashMap<Double, Double> map = new HashMap<>();
+        private Map<Integer, Double> toMapIntegerDouble(ObservableList<XYChart.Data<Number, Number>> data) {
+            HashMap<Integer, Double> map = new HashMap<>();
 
             for (XYChart.Data<Number, Number> datum : data) {
-                map.put(datum.getXValue().doubleValue(), datum.getYValue().doubleValue());
+                map.put(datum.getXValue().intValue(), datum.getYValue().doubleValue());
             }
 
             return map;
         }
 
-        private void fillMapInto(Map<Double, Double> map, ObservableList<XYChart.Data<Number, Number>> data) {
+        private void fillMapInto(Map<Integer, Double> map, ObservableList<XYChart.Data<Number, Number>> data) {
             data.clear();
             if (map != null) {
-                for (Map.Entry<Double, Double> entry : map.entrySet()) {
+                for (Map.Entry<Integer, Double> entry : map.entrySet()) {
                     data.add(new XYChart.Data<>(entry.getKey(), entry.getValue()));
                 }
             }
