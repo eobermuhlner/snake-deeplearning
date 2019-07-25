@@ -53,6 +53,7 @@ import java.util.function.Supplier;
 public class SnakeJavafxApp extends Application {
 
     private static final DecimalFormat INTEGER_FORMAT = new DecimalFormat("##0");
+    private static final DecimalFormat DOUBLE_FORMAT = new DecimalFormat("##0.#########");
 
     private static final Format TOSTRING_FORMAT = new Format() {
         @Override
@@ -228,6 +229,10 @@ public class SnakeJavafxApp extends Application {
         ObjectProperty<Activation> defaultActivationProperty = new SimpleObjectProperty<>();
         ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>();
         ObjectProperty<LossFunctions.LossFunction> outputLossFunctionProperty = new SimpleObjectProperty<>();
+        ObjectProperty<DeeplearningSnakeController.Updater> updaterProperty = new SimpleObjectProperty<>();
+        DoubleProperty learningRateProperty = new SimpleDoubleProperty();
+        DoubleProperty momentumProperty = new SimpleDoubleProperty();
+        DoubleProperty epsilonProperty = new SimpleDoubleProperty();
 
         int rowIndex = 0;
         addLabel(propertiesPane, rowIndex++, "Name:", nameProperty);
@@ -236,6 +241,10 @@ public class SnakeJavafxApp extends Application {
         addLabel(propertiesPane, rowIndex++, "Default Activation:", defaultActivationProperty, TOSTRING_FORMAT);
         addLabel(propertiesPane, rowIndex++, "Output Activation:", outputActivationProperty, TOSTRING_FORMAT);
         addLabel(propertiesPane, rowIndex++, "Output Loss Function:", outputLossFunctionProperty, TOSTRING_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Updater:", updaterProperty, TOSTRING_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Learning Rate:", learningRateProperty, TOSTRING_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Momentum:", momentumProperty, TOSTRING_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Epsilon:", epsilonProperty, TOSTRING_FORMAT);
 
         addLabel(propertiesPane, rowIndex++, "");
         addComboBox(propertiesPane, rowIndex++, "Teacher:", controllerListProperty, trainTeacherControllerProperty);
@@ -315,6 +324,10 @@ public class SnakeJavafxApp extends Application {
             defaultActivationProperty.set(newValue.getDeeplearningConfiguration().defaultActivation);
             outputActivationProperty.set(newValue.getDeeplearningConfiguration().outputActivation);
             outputLossFunctionProperty.set(newValue.getDeeplearningConfiguration().outputLossFunction);
+            updaterProperty.set(newValue.getDeeplearningConfiguration().updater);
+            learningRateProperty.set(newValue.getDeeplearningConfiguration().learningRate);
+            momentumProperty.set(newValue.getDeeplearningConfiguration().momentum);
+            epsilonProperty.set(newValue.getDeeplearningConfiguration().epsilon);
 
             TrainingData trainingData = loadTrainingData(newValue.getName());
             epochProperty.setValue(trainingData.epoch);
@@ -376,12 +389,18 @@ public class SnakeJavafxApp extends Application {
         ListProperty<Activation> activationListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(Activation.values()));
         ListProperty<WeightInit> weightInitListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(WeightInit.values()));
         ListProperty<LossFunctions.LossFunction> lossFunctionListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(LossFunctions.LossFunction.values()));
+        ListProperty<DeeplearningSnakeController.Updater> updaterListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(DeeplearningSnakeController.Updater.values()));
 
         ObjectProperty<Integer> inputWidthProperty = new SimpleObjectProperty<>(defaultConfiguration.inputWidth);
         ObjectProperty<Activation> defaultActivationProperty = new SimpleObjectProperty<>(defaultConfiguration.defaultActivation);
         ObjectProperty<WeightInit> defaultWeightInitProperty = new SimpleObjectProperty<>(defaultConfiguration.defaultWeightInit);
         ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>(defaultConfiguration.outputActivation);
         ObjectProperty<LossFunctions.LossFunction> outputLossFunctionProperty = new SimpleObjectProperty<>(defaultConfiguration.outputLossFunction);
+        ObjectProperty<DeeplearningSnakeController.Updater> updaterProperty = new SimpleObjectProperty<>(defaultConfiguration.updater);
+        DoubleProperty learningRateProperty = new SimpleDoubleProperty(defaultConfiguration.learningRate);
+        DoubleProperty momentumProperty = new SimpleDoubleProperty(defaultConfiguration.momentum);
+        DoubleProperty epsilonProperty = new SimpleDoubleProperty(defaultConfiguration.epsilon);
+
         StringProperty messageProperty = new SimpleStringProperty();
 
         for (int i = 3; i < 40; i+=2) {
@@ -400,6 +419,11 @@ public class SnakeJavafxApp extends Application {
         addComboBox(gridPane, rowIndex++, "Default Weight Init:", weightInitListProperty, defaultWeightInitProperty);
         addComboBox(gridPane, rowIndex++, "Output Activation:", activationListProperty, outputActivationProperty);
         addComboBox(gridPane, rowIndex++, "Output Loss Function:", lossFunctionListProperty, outputLossFunctionProperty);
+        addComboBox(gridPane, rowIndex++, "Updater:", updaterListProperty, updaterProperty);
+        TextField learningRateTextField = addTextField(gridPane, rowIndex++, "Learning Rate:", learningRateProperty, DOUBLE_FORMAT);
+        addTextField(gridPane, rowIndex++, "Momentum:", momentumProperty, DOUBLE_FORMAT);
+        addTextField(gridPane, rowIndex++, "Epsilon:", epsilonProperty, DOUBLE_FORMAT);
+
         addTextArea(gridPane, rowIndex++, "Message:", messageProperty);
 
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
@@ -412,6 +436,10 @@ public class SnakeJavafxApp extends Application {
             configuration.defaultWeightInit = defaultWeightInitProperty.get();
             configuration.outputActivation = outputActivationProperty.get();
             configuration.outputLossFunction = outputLossFunctionProperty.get();
+            configuration.updater = updaterProperty.get();
+            configuration.learningRate = learningRateProperty.get();
+            configuration.momentum = momentumProperty.get();
+            configuration.epsilon = epsilonProperty.get();
             return DeeplearningSnakeController.create(nameProperty.get(), configuration);
         };
 
@@ -443,10 +471,17 @@ public class SnakeJavafxApp extends Application {
         nameProperty.addListener((observable, oldValue, newValue) -> {
             validator.run();
         });
+        defaultActivationProperty.addListener((observable, oldValue, newValue) -> {
+            validator.run();
+        });
         outputActivationProperty.addListener((observable, oldValue, newValue) -> {
             validator.run();
         });
         outputLossFunctionProperty.addListener((observable, oldValue, newValue) -> {
+            validator.run();
+        });
+        updaterProperty.addListener((observable, oldValue, newValue) -> {
+            learningRateTextField.setDisable(newValue == DeeplearningSnakeController.Updater.AdaDelta);
             validator.run();
         });
         dialog.setResultConverter(dialogButton -> {
@@ -559,6 +594,14 @@ public class SnakeJavafxApp extends Application {
         TextField control = new TextField();
         gridPane.add(control, 1, rowIndex);
         Bindings.bindBidirectional(control.textProperty(), property);
+        return control;
+    }
+
+    private TextField addTextField(GridPane gridPane, int rowIndex, String label, Property property, Format format) {
+        gridPane.add(new Label(label), 0, rowIndex);
+        TextField control = new TextField();
+        gridPane.add(control, 1, rowIndex);
+        Bindings.bindBidirectional(control.textProperty(), property, format);
         return control;
     }
 

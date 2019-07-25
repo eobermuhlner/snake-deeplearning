@@ -14,7 +14,7 @@ import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.learning.config.AdaDelta;
+import org.nd4j.linalg.learning.config.*;
 import org.nd4j.linalg.lossfunctions.ILossFunction;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 import snake.domain.*;
@@ -375,7 +375,7 @@ public class DeeplearningSnakeController implements SnakeController {
                 .activation(deeplearningConfiguration.defaultActivation)
                 .weightInit(deeplearningConfiguration.defaultWeightInit)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                .updater(new AdaDelta())
+                .updater(toUpdater(deeplearningConfiguration))
                 .list()
                 .layer(0, new DenseLayer.Builder().nIn(inputCount).nOut(denseCount).build())
                 .layer(1, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
@@ -387,6 +387,32 @@ public class DeeplearningSnakeController implements SnakeController {
                 .build();
         MultiLayerNetwork network = new MultiLayerNetwork(configuration);
         return network;
+    }
+
+    private static IUpdater toUpdater(DeeplearningConfiguration configuration) {
+        switch (configuration.updater) {
+            case AdaDelta:
+                return new AdaDelta();
+            case AdaGrad:
+                return new AdaGrad(configuration.learningRate, configuration.epsilon);
+            case Adam:
+                return new Adam(configuration.learningRate); // beta1, beta2, epsilon
+            case AdaMax:
+                return new AdaMax(configuration.learningRate);
+            case AMSGrad:
+                return new AMSGrad(configuration.learningRate);
+            case NoOp:
+                return new NoOp();
+            case Nesterovs:
+                return new Nesterovs(configuration.learningRate, configuration.momentum);
+            case Nadam:
+                return new Nadam(configuration.learningRate); // beta1, beta2, epsilon
+            case RmsProp:
+                return new RmsProp(configuration.learningRate); // rmsDecay, epsilon
+            case Sgd:
+                return new Sgd(configuration.learningRate);
+        }
+        throw new RuntimeException("Unknown: " + configuration.updater);
     }
 
     public DeeplearningConfiguration getDeeplearningConfiguration() {
@@ -403,6 +429,19 @@ public class DeeplearningSnakeController implements SnakeController {
         }
     }
 
+    public enum Updater {
+        AdaDelta,
+        AdaGrad,
+        Adam,
+        AdaMax,
+        AMSGrad,
+        NoOp,
+        Nesterovs,
+        Nadam,
+        RmsProp,
+        Sgd
+    }
+
     public static class DeeplearningConfiguration {
         public int inputWidth = 5;
 
@@ -411,6 +450,11 @@ public class DeeplearningSnakeController implements SnakeController {
 
         public Activation outputActivation = Activation.SOFTMAX;
         public LossFunctions.LossFunction outputLossFunction = LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD;
+
+        public Updater updater = Updater.AdaDelta;
+        public double learningRate = 0.01;
+        public double momentum = 0.9;
+        public double epsilon = 1e-8;
 
         public DeeplearningConfiguration() {
         }
