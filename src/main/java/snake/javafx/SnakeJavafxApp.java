@@ -43,17 +43,15 @@ import java.text.DecimalFormat;
 import java.text.FieldPosition;
 import java.text.Format;
 import java.text.ParsePosition;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public class SnakeJavafxApp extends Application {
 
-    private static final DecimalFormat INTEGER_FORMAT = new DecimalFormat("##0");
-    private static final DecimalFormat DOUBLE_FORMAT = new DecimalFormat("##0.#########");
+    private static final DecimalFormat INTEGER_FORMAT = new DecimalFormat("#0");
+    private static final DecimalFormat DOUBLE_FORMAT = new DecimalFormat("#0.########");
 
     private static final Format TOSTRING_FORMAT = new Format() {
         @Override
@@ -225,6 +223,7 @@ public class SnakeJavafxApp extends Application {
 
         StringProperty nameProperty = new SimpleStringProperty();
         IntegerProperty inputWidthProperty = new SimpleIntegerProperty();
+        StringProperty hiddenLayerSizesProperty = new SimpleStringProperty();
         ObjectProperty<WeightInit> defaultWeightInitProperty = new SimpleObjectProperty<>();
         ObjectProperty<Activation> defaultActivationProperty = new SimpleObjectProperty<>();
         ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>();
@@ -237,6 +236,7 @@ public class SnakeJavafxApp extends Application {
         int rowIndex = 0;
         addLabel(propertiesPane, rowIndex++, "Name:", nameProperty);
         addLabel(propertiesPane, rowIndex++, "Input Width:", inputWidthProperty, INTEGER_FORMAT);
+        addLabel(propertiesPane, rowIndex++, "Hidden Layers:", hiddenLayerSizesProperty);
         addLabel(propertiesPane, rowIndex++, "Default Weight Init:", defaultWeightInitProperty, TOSTRING_FORMAT);
         addLabel(propertiesPane, rowIndex++, "Default Activation:", defaultActivationProperty, TOSTRING_FORMAT);
         addLabel(propertiesPane, rowIndex++, "Output Activation:", outputActivationProperty, TOSTRING_FORMAT);
@@ -320,6 +320,7 @@ public class SnakeJavafxApp extends Application {
             nameProperty.set(newValue.toString());
 
             inputWidthProperty.set(newValue.getDeeplearningConfiguration().inputWidth);
+            hiddenLayerSizesProperty.set(toString(newValue.getDeeplearningConfiguration().hiddenLayerSizes));
             defaultWeightInitProperty.set(newValue.getDeeplearningConfiguration().defaultWeightInit);
             defaultActivationProperty.set(newValue.getDeeplearningConfiguration().defaultActivation);
             outputActivationProperty.set(newValue.getDeeplearningConfiguration().outputActivation);
@@ -339,6 +340,20 @@ public class SnakeJavafxApp extends Application {
         masterDeeplearningControllerListView.getSelectionModel().select(0);
 
         return masterDetailPane;
+    }
+
+    private String toString(List<Integer> integers) {
+        return integers.stream()
+                .map(i -> INTEGER_FORMAT.format(i))
+                .collect(Collectors.joining(", "));
+    }
+
+    private List<Integer> toList(String string) {
+        String[] split = string.split(",");
+        return Arrays.stream(split)
+                .map(s -> s.trim())
+                .map(s -> Integer.parseInt(s))
+                .collect(Collectors.toList());
     }
 
     private void saveTraining(String name, int epoch, ObservableList<XYChart.Data<Number, Number>> scoreData, ObservableList<XYChart.Data<Number, Number>> statisticsDeadData, ObservableList<XYChart.Data<Number, Number>> statisticsEatenData) {
@@ -392,6 +407,7 @@ public class SnakeJavafxApp extends Application {
         ListProperty<DeeplearningSnakeController.Updater> updaterListProperty = new SimpleListProperty<>(FXCollections.observableArrayList(DeeplearningSnakeController.Updater.values()));
 
         ObjectProperty<Integer> inputWidthProperty = new SimpleObjectProperty<>(defaultConfiguration.inputWidth);
+        StringProperty hiddenLayerSizesProperty = new SimpleStringProperty(toString(defaultConfiguration.hiddenLayerSizes));
         ObjectProperty<Activation> defaultActivationProperty = new SimpleObjectProperty<>(defaultConfiguration.defaultActivation);
         ObjectProperty<WeightInit> defaultWeightInitProperty = new SimpleObjectProperty<>(defaultConfiguration.defaultWeightInit);
         ObjectProperty<Activation> outputActivationProperty = new SimpleObjectProperty<>(defaultConfiguration.outputActivation);
@@ -415,6 +431,7 @@ public class SnakeJavafxApp extends Application {
         int rowIndex = 0;
         TextField nameTextField = addTextField(gridPane, rowIndex++, "Name:", nameProperty);
         addComboBox(gridPane, rowIndex++, "Input Width:", inputWidthListProperty, inputWidthProperty);
+        addTextField(gridPane, rowIndex++, "Hidden Layers:", hiddenLayerSizesProperty);
         addComboBox(gridPane, rowIndex++, "Default Activation:", activationListProperty, defaultActivationProperty);
         addComboBox(gridPane, rowIndex++, "Default Weight Init:", weightInitListProperty, defaultWeightInitProperty);
         addComboBox(gridPane, rowIndex++, "Output Activation:", activationListProperty, outputActivationProperty);
@@ -432,6 +449,7 @@ public class SnakeJavafxApp extends Application {
         Supplier<DeeplearningSnakeController> createDeeplearningSnakeController = () -> {
             DeeplearningSnakeController.DeeplearningConfiguration configuration = new DeeplearningSnakeController.DeeplearningConfiguration();
             configuration.inputWidth = inputWidthProperty.get();
+            configuration.hiddenLayerSizes = toList(hiddenLayerSizesProperty.get());
             configuration.defaultActivation = defaultActivationProperty.get();
             configuration.defaultWeightInit = defaultWeightInitProperty.get();
             configuration.outputActivation = outputActivationProperty.get();

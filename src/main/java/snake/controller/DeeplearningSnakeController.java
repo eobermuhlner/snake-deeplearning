@@ -367,8 +367,9 @@ public class DeeplearningSnakeController implements SnakeController {
     private static MultiLayerNetwork createNetwork(DeeplearningConfiguration deeplearningConfiguration) {
         final int inputWidth = deeplearningConfiguration.inputWidth;
         final int inputCount = inputWidth * inputWidth + 2;
-        final int denseCount = deeplearningConfiguration.inputWidth;
-        MultiLayerConfiguration configuration = new NeuralNetConfiguration.Builder()
+
+        int layerIndex = 0;
+        NeuralNetConfiguration.ListBuilder listBuilder = new NeuralNetConfiguration.Builder()
                 .seed(123)
                 .l2(0.0001)
                 .miniBatch(true)
@@ -377,10 +378,18 @@ public class DeeplearningSnakeController implements SnakeController {
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .updater(toUpdater(deeplearningConfiguration))
                 .list()
-                .layer(0, new DenseLayer.Builder().nIn(inputCount).nOut(denseCount).build())
-                .layer(1, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
-                .layer(2, new DenseLayer.Builder().nIn(denseCount).nOut(denseCount).build())
-                .layer(3, new OutputLayer.Builder().nIn(denseCount).nOut(OUTPUT_COUNT)
+                .layer(layerIndex++, new DenseLayer.Builder().nIn(inputCount).nOut(deeplearningConfiguration.hiddenLayerSizes.get(0)).build());
+
+        int hiddenLayerCount = deeplearningConfiguration.hiddenLayerSizes.size();
+        for (int i = 0; i < hiddenLayerCount-1; i++) {
+            int inSize = deeplearningConfiguration.hiddenLayerSizes.get(i);
+            int outSize = deeplearningConfiguration.hiddenLayerSizes.get(i + 1);
+            listBuilder.layer(layerIndex++, new DenseLayer.Builder().nIn(inSize).nOut(outSize).build());
+        }
+
+        int lastHiddenLayerSize = deeplearningConfiguration.hiddenLayerSizes.get(hiddenLayerCount-1);
+        MultiLayerConfiguration configuration = listBuilder
+                .layer(layerIndex++, new OutputLayer.Builder().nIn(lastHiddenLayerSize).nOut(OUTPUT_COUNT)
                         .activation(deeplearningConfiguration.outputActivation)
                         .lossFunction(deeplearningConfiguration.outputLossFunction)
                         .build())
@@ -447,6 +456,8 @@ public class DeeplearningSnakeController implements SnakeController {
 
         public Activation defaultActivation = Activation.RELU;
         public WeightInit defaultWeightInit = WeightInit.XAVIER;
+
+        public List<Integer> hiddenLayerSizes = new ArrayList<>(Arrays.asList(25));
 
         public Activation outputActivation = Activation.SOFTMAX;
         public LossFunctions.LossFunction outputLossFunction = LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD;
